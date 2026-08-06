@@ -2,11 +2,12 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from classifier import classify_incident
 
 app = FastAPI(title="Incident Triage AI Service")
 
 
-
+# ---- Pydantic models (request/response schemas) ----
 
 class AlertIn(BaseModel):
     source: str                          # e.g. "payment-service"
@@ -19,6 +20,16 @@ class AlertAck(BaseModel):
     received: bool
     source: str
     message_preview: str
+
+
+class ClassifyRequest(BaseModel):
+    log_message: str
+
+
+class ClassifyResponse(BaseModel):
+    severity: str
+    category: str
+    reasoning: str
 
 
 # ---- Routes ----
@@ -36,3 +47,9 @@ async def ingest_alert(alert: AlertIn):
         source=alert.source,
         message_preview=preview
     )
+
+
+@app.post("/alerts/classify", response_model=ClassifyResponse)
+async def classify_alert(request: ClassifyRequest):
+    result = classify_incident(request.log_message)
+    return ClassifyResponse(**result)
