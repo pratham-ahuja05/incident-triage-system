@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 from classifier import classify_incident
+from agent import make_decision
 
 app = FastAPI(title="Incident Triage AI Service")
 
@@ -32,6 +33,10 @@ class ClassifyResponse(BaseModel):
     reasoning: str
 
 
+class TriageRequest(BaseModel):
+    log_message: str
+
+
 # ---- Routes ----
 
 @app.get("/health")
@@ -53,3 +58,9 @@ async def ingest_alert(alert: AlertIn):
 async def classify_alert(request: ClassifyRequest):
     result = classify_incident(request.log_message)
     return ClassifyResponse(**result)
+
+
+@app.post("/triage")
+async def triage_alert(request: TriageRequest):
+    result = make_decision(request.log_message)
+    return result
