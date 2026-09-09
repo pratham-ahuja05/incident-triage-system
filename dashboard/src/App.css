@@ -1,0 +1,114 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, "Segoe UI", sans-serif;
+  background: #0f1117;
+  color: #e4e4e7;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+h1 {
+  font-size: 1.8rem;
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  color: #9ca3af;
+  margin-bottom: 1.5rem;
+}
+
+.status-message {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.1rem;
+}
+
+.error {
+  color: #f87171;
+}
+
+.alert-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.alert-card {
+  background: #1a1d27;
+  border: 1px solid #2a2e3a;
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.alert-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.alert-source {
+  font-weight: 600;
+  color: #a5b4fc;
+}
+
+.status-badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.status-pending { background: #78350f; color: #fde68a; }
+.status-processing { background: #1e3a8a; color: #bfdbfe; }
+.status-completed { background: #14532d; color: #bbf7d0; }
+.status-failed { background: #7f1d1d; color: #fecaca; }
+
+.alert-message {
+  font-family: monospace;
+  font-size: 0.9rem;
+  color: #d1d5db;
+  margin-bottom: 0.75rem;
+}
+
+.decision-box {
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.decision-fix {
+  background: #052e16;
+  border: 1px solid #14532d;
+}
+
+.decision-escalate {
+  background: #450a0a;
+  border: 1px solid #7f1d1d;
+}
+
+.decision-pending {
+  background: #1f2937;
+  color: #9ca3af;
+}
+
+.reasoning {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  margin-top: 0.4rem;
+}
+
+.confidence {
+  color: #6b7280;
+  font-size: 0.8rem;
+  margin-top: 0.3rem;
+}
