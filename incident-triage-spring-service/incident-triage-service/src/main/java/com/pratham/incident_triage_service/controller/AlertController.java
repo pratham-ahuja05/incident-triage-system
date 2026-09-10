@@ -9,11 +9,13 @@ import com.pratham.incident_triage_service.entity.TriageResult;
 import com.pratham.incident_triage_service.repository.AlertRepository;
 import com.pratham.incident_triage_service.repository.TriageResultRepository;
 import com.pratham.incident_triage_service.service.AlertQueueProducer;
+import com.pratham.incident_triage_service.config.RateLimitConfig;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.github.bucket4j.Bucket;
 
 @CrossOrigin(origins = "http://localhost:5173")
 @RestController
@@ -26,8 +28,23 @@ public class AlertController {
     @Autowired
     private AlertQueueProducer alertQueueProducer;
 
+    @Autowired
+    private TriageResultRepository triageResultRepository;
+
+    private final Bucket rateLimitBucket;
+
+    // Constructor injection for the rate limit bucket — created once when the controller is built
+    public AlertController(RateLimitConfig rateLimitConfig) {
+        this.rateLimitBucket = rateLimitConfig.createNewBucket();
+    }
+
     @PostMapping
-    public ResponseEntity<Alert> ingestAlert(@Valid @RequestBody AlertRequest request) {
+    public ResponseEntity<?> ingestAlert(@Valid @RequestBody AlertRequest request) {
+        if (!rateLimitBucket.tryConsume(1)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body("Rate limit exceeded. Please slow down.");
+        }
+
         Alert alert = new Alert();
         alert.setSource(request.getSource());
         alert.setMessage(request.getMessage());
@@ -44,9 +61,6 @@ public class AlertController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-
-    @Autowired
-    private TriageResultRepository triageResultRepository;
 
     @GetMapping
     public ResponseEntity<List<AlertWithResult>> getAllAlerts() {

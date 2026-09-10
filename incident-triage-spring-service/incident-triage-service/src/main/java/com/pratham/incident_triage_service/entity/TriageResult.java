@@ -23,6 +23,9 @@ public class TriageResult {
     @Column(nullable = false)
     private String decision; // "auto_suggest_fix" or "escalate"
 
+    @Column(nullable = false)
+    private String humanReviewStatus = "PENDING_REVIEW"; // PENDING_REVIEW, APPROVED, REJECTED
+
     @Column(columnDefinition = "TEXT")
     private String suggestedResolution; // nullable — only present for auto_suggest_fix
 

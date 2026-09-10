@@ -73,18 +73,29 @@ Candidate resolution: {candidate.resolution}
 Respond with ONLY valid JSON, no other text:
 {{"is_match": true or false, "reasoning": "one sentence explanation"}}
 """
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        max_tokens=150,
-        messages=[{"role": "user", "content": prompt}]
-    )
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=150,
+            messages=[{"role": "user", "content": prompt}],
+            timeout=15  # don't wait forever if Groq is slow/unresponsive
+        )
+    except Exception as e:
+        # LLM API call itself failed (network, timeout, rate limit, service down)
+        print(f"[LLM ERROR] API call failed: {e}")
+        return {"is_match": False, "reasoning": f"LLM API call failed ({type(e).__name__}), defaulting to escalation for safety."}
+
     raw = response.choices[0].message.content.strip()
     if raw.startswith("```"):
         raw = raw.strip("`").replace("json", "", 1).strip()
     try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        # Fallback: if LLM response fails to parse, don't silently trust the match — escalate instead
+        result = json.loads(raw)
+        # Sanity check: LLM might return valid JSON with wrong/missing keys
+        if "is_match" not in result or not isinstance(result["is_match"], bool):
+            raise ValueError("Missing or invalid 'is_match' field")
+        return result
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"[LLM ERROR] Response parsing failed: {e}")
         return {"is_match": False, "reasoning": "LLM verdict parsing failed, defaulting to escalation for safety."}
 
 

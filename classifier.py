@@ -25,13 +25,18 @@ Log message:
 def classify_incident(log_message: str) -> dict:
     prompt = CLASSIFICATION_PROMPT.format(log_message=log_message)
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",  # good balance of speed + quality on Groq
-        max_tokens=200,
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",  # good balance of speed + quality on Groq
+            max_tokens=200,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+    except Exception as e:
+        # LLM API call itself failed (network, timeout, rate limit, service down)
+        print(f"[LLM ERROR] API call failed: {e}")
+        return {"is_match": "False", "reasoning": "api_call_failed"}
 
     raw_text = response.choices[0].message.content.strip()
 

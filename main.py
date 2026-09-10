@@ -34,7 +34,7 @@ class ClassifyResponse(BaseModel):
 
 
 class TriageRequest(BaseModel):
-    log_message: str
+    log_message: str = Field(..., min_length=1, max_length=5000)
 
 
 # ---- Routes ----
