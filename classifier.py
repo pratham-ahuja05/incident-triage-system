@@ -27,16 +27,17 @@ def classify_incident(log_message: str) -> dict:
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",  # good balance of speed + quality on Groq
+            model="llama-3.3-70b-versatile",
             max_tokens=200,
             messages=[
                 {"role": "user", "content": prompt}
-            ]
+            ],
+            timeout=10
         )
     except Exception as e:
         # LLM API call itself failed (network, timeout, rate limit, service down)
         print(f"[LLM ERROR] API call failed: {e}")
-        return {"is_match": "False", "reasoning": "api_call_failed"}
+        return {"severity": "unknown", "category": "unknown", "reasoning": "api_call_failed"}
 
     raw_text = response.choices[0].message.content.strip()
 
@@ -45,7 +46,10 @@ def classify_incident(log_message: str) -> dict:
 
     try:
         result = json.loads(raw_text)
-    except json.JSONDecodeError:
+        # Sanity check: valid JSON but wrong/missing keys should also fall back safely
+        if not all(k in result for k in ("severity", "category", "reasoning")):
+            raise ValueError("Missing expected keys in LLM response")
+    except (json.JSONDecodeError, ValueError):
         result = {"severity": "unknown", "category": "unknown", "reasoning": "parse_failed"}
 
     return result
