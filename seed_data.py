@@ -23,7 +23,7 @@ Make log_messages varied in wording/style (some short, some verbose, some with s
 
 def generate_batch():
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         max_tokens=2000,
         messages=[{"role": "user", "content": GENERATION_PROMPT}]
     )
