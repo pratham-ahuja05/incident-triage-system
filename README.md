@@ -64,8 +64,8 @@ This project is being built incrementally, day by day, with a focus on understan
 | Spring Boot ingestion API + Redis queue (producer/consumer) | ✅ Done |
 | Spring Boot ↔ Python service integration (WebClient) | ✅ Done |
 | End-to-end verified pipeline (Postman → Postgres) | ✅ Done |
-| React dashboard | 🔜 Planned |
-| Guardrails: rate limiting, human override, fallback hardening | 🔜 Planned |
+| React dashboard | ✅ Done |
+| Guardrails: rate limiting, human override, fallback hardening | ✅ Done |
 | Deployment (Render/Railway/Supabase/Vercel) | 🔜 Planned |
 
 ---
