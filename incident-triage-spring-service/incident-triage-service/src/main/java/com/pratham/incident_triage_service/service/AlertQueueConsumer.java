@@ -61,39 +61,41 @@ public class AlertQueueConsumer {
     }
 
     private void processAlert(Long alertId) {
-        Optional<Alert> optionalAlert = alertRepository.findById(alertId);
-        if (optionalAlert.isEmpty()) return;
+    Optional<Alert> optionalAlert = alertRepository.findById(alertId);
+    if (optionalAlert.isEmpty()) return;
 
-        Alert alert = optionalAlert.get();
-        alert.setStatus("PROCESSING");
+    Alert alert = optionalAlert.get();
+    alert.setStatus("PROCESSING");
+    alertRepository.save(alert);
+
+    try {
+        Map<String, String> requestBody = new HashMap<>();
+        requestBody.put("log_message", alert.getMessage());
+
+        TriageResponse response = webClient.post()
+                .uri(pythonServiceUrl + "/triage")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(TriageResponse.class)
+                .block();
+
+        TriageResult result = new TriageResult();
+        result.setAlertId(alertId);
+        result.setDecision(response.getDecision());
+        result.setSuggestedResolution(response.getSuggestedResolution());
+        result.setReasoning(response.getReasoning());
+        result.setConfidenceDistance(response.getConfidenceDistance());
+        result.setMatchedIncidentId(response.getMatchedIncidentId());
+        result.setMatchedLog(response.getMatchedLog());
+        triageResultRepository.save(result);
+
+        alert.setStatus("COMPLETED");
         alertRepository.save(alert);
 
-        try {
-            Map<String, String> requestBody = new HashMap<>();
-            requestBody.put("log_message", alert.getMessage());
-
-            TriageResponse response = webClient.post()
-                    .uri(pythonServiceUrl + "/triage")
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToMono(TriageResponse.class)
-                    .block();
-
-            TriageResult result = new TriageResult();
-            result.setAlertId(alertId);
-            result.setDecision(response.getDecision());
-            result.setSuggestedResolution(response.getSuggestedResolution());
-            result.setReasoning(response.getReasoning());
-            result.setConfidenceDistance(response.getConfidenceDistance());
-            triageResultRepository.save(result);
-
-            alert.setStatus("COMPLETED");
-            alertRepository.save(alert);
-
-        } catch (Exception e) {
-            System.err.println("Failed to process alert " + alertId + ": " + e.getMessage());
-            alert.setStatus("FAILED");
-            alertRepository.save(alert);
-        }
+    } catch (Exception e) {
+        System.err.println("Failed to process alert " + alertId + ": " + e.getMessage());
+        alert.setStatus("FAILED");
+        alertRepository.save(alert);
     }
+}
 }

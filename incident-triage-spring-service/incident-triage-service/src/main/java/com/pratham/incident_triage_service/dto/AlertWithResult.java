@@ -13,9 +13,12 @@ public class AlertWithResult {
     private String status;
     private LocalDateTime createdAt;
 
-    // nullable — alert abhi tak process nahi hua ho sakta
+    private Long triageResultId;
     private String decision;
     private String suggestedResolution;
     private String reasoning;
     private Double confidenceDistance;
+    private String humanReviewStatus;
+    private Long matchedIncidentId;
+    private String matchedLog;
 }

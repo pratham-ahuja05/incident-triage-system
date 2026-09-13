@@ -18,21 +18,27 @@ public class TriageResult {
     private Long id;
 
     @Column(nullable = false)
-    private Long alertId; // FK reference to Alert.id — kept simple (no @ManyToOne) for now
+    private Long alertId;
 
     @Column(nullable = false)
-    private String decision; // "auto_suggest_fix" or "escalate"
-
-    @Column(nullable = false)
-    private String humanReviewStatus = "PENDING_REVIEW"; // PENDING_REVIEW, APPROVED, REJECTED
+    private String decision;
 
     @Column(columnDefinition = "TEXT")
-    private String suggestedResolution; // nullable — only present for auto_suggest_fix
+    private String suggestedResolution;
 
     @Column(columnDefinition = "TEXT")
     private String reasoning;
 
-    private Double confidenceDistance; // nullable — only present for auto_suggest_fix
+    private Double confidenceDistance;
+
+    // NEW — populated whenever a candidate incident was retrieved, whether or not it was ultimately used
+    private Long matchedIncidentId;
+
+    @Column(columnDefinition = "TEXT")
+    private String matchedLog;
+
+    @Column(nullable = false)
+    private String humanReviewStatus = "PENDING_REVIEW";
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

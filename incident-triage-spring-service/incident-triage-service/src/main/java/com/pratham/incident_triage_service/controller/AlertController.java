@@ -63,29 +63,33 @@ public class AlertController {
     }
 
     @GetMapping
-    public ResponseEntity<List<AlertWithResult>> getAllAlerts() {
-        List<Alert> alerts = alertRepository.findAll();
-        List<AlertWithResult> combined = new ArrayList<>();
+public ResponseEntity<List<AlertWithResult>> getAllAlerts() {
+    List<Alert> alerts = alertRepository.findAll();
+    List<AlertWithResult> combined = new ArrayList<>();
 
-        for (Alert alert : alerts) {
-            TriageResult result = triageResultRepository.findAll().stream()
-                    .filter(r -> r.getAlertId().equals(alert.getId()))
-                    .findFirst()
-                    .orElse(null);
+    for (Alert alert : alerts) {
+        TriageResult result = triageResultRepository.findAll().stream()
+                .filter(r -> r.getAlertId().equals(alert.getId()))
+                .findFirst()
+                .orElse(null);
 
-            combined.add(new AlertWithResult(
-                    alert.getId(),
-                    alert.getSource(),
-                    alert.getMessage(),
-                    alert.getStatus(),
-                    alert.getCreatedAt(),
-                    result != null ? result.getDecision() : null,
-                    result != null ? result.getSuggestedResolution() : null,
-                    result != null ? result.getReasoning() : null,
-                    result != null ? result.getConfidenceDistance() : null
-            ));
-        }
-
-        return ResponseEntity.ok(combined);
+        combined.add(new AlertWithResult(
+                alert.getId(),
+                alert.getSource(),
+                alert.getMessage(),
+                alert.getStatus(),
+                alert.getCreatedAt(),
+                result != null ? result.getId() : null,
+                result != null ? result.getDecision() : null,
+                result != null ? result.getSuggestedResolution() : null,
+                result != null ? result.getReasoning() : null,
+                result != null ? result.getConfidenceDistance() : null,
+                result != null ? result.getHumanReviewStatus() : null,
+                result != null ? result.getMatchedIncidentId() : null,
+                result != null ? result.getMatchedLog() : null
+        ));
     }
+
+    return ResponseEntity.ok(combined);
+}
 }

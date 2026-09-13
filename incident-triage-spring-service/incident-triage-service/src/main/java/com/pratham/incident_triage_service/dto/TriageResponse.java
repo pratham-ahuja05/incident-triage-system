@@ -9,6 +9,9 @@ public class TriageResponse {
     private String decision;
     private String alert;
 
+    @JsonProperty("matched_incident_id")
+    private Long matchedIncidentId;
+
     @JsonProperty("matched_log")
     private String matchedLog;
 

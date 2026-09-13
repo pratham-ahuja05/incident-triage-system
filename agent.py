@@ -3,7 +3,6 @@ import json
 import requests
 from dotenv import load_dotenv
 from groq import Groq
-from retrieval import retrieve_similar_incidents
 from embeddings import generate_embedding
 from models import SessionLocal, PastIncident
 
@@ -11,11 +10,10 @@ load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 
-DISTANCE_THRESHOLD = 0.4  # below this = "close enough" to consider auto-fix; tune this after testing
+DISTANCE_THRESHOLD = 0.4
 
 
 def get_top_match_with_distance(log_message: str):
-    """Retrieve top-1 similar incident AND its raw cosine distance (not just the record)."""
     query_embedding = generate_embedding(log_message)
     session = SessionLocal()
     try:
@@ -42,14 +40,14 @@ def make_decision(alert_message: str) -> dict:
     if top_match is None:
         return escalate(alert_message, reason="No past incidents in database to compare against.")
 
-    # Step 1: fast threshold pre-filter
     if distance > DISTANCE_THRESHOLD:
         return escalate(
             alert_message,
-            reason=f"No sufficiently similar past incident found (distance={distance:.3f}, threshold={DISTANCE_THRESHOLD})."
+            reason=f"Closest past incident was too dissimilar (distance={distance:.3f}, threshold={DISTANCE_THRESHOLD}).",
+            candidate=top_match,
+            distance=distance,
         )
 
-    # Step 2: close match found — let LLM reason about whether it's genuinely the same issue
     llm_verdict = llm_confirm_match(alert_message, top_match)
 
     if llm_verdict["is_match"]:
@@ -57,7 +55,9 @@ def make_decision(alert_message: str) -> dict:
     else:
         return escalate(
             alert_message,
-            reason=f"Vector search found a candidate, but LLM determined it's not a genuine match: {llm_verdict['reasoning']}"
+            reason=f"A close vector match was found, but the LLM determined it wasn't genuinely the same issue: {llm_verdict['reasoning']}",
+            candidate=top_match,
+            distance=distance,
         )
 
 
@@ -78,10 +78,9 @@ Respond with ONLY valid JSON, no other text:
             model="openai/gpt-oss-120b",
             max_tokens=150,
             messages=[{"role": "user", "content": prompt}],
-            timeout=15  # don't wait forever if Groq is slow/unresponsive
+            timeout=10
         )
     except Exception as e:
-        # LLM API call itself failed (network, timeout, rate limit, service down)
         print(f"[LLM ERROR] API call failed: {e}")
         return {"is_match": False, "reasoning": f"LLM API call failed ({type(e).__name__}), defaulting to escalation for safety."}
 
@@ -90,12 +89,10 @@ Respond with ONLY valid JSON, no other text:
         raw = raw.strip("`").replace("json", "", 1).strip()
     try:
         result = json.loads(raw)
-        # Sanity check: LLM might return valid JSON with wrong/missing keys
         if "is_match" not in result or not isinstance(result["is_match"], bool):
             raise ValueError("Missing or invalid 'is_match' field")
         return result
-    except (json.JSONDecodeError, ValueError) as e:
-        print(f"[LLM ERROR] Response parsing failed: {e}")
+    except (json.JSONDecodeError, ValueError):
         return {"is_match": False, "reasoning": "LLM verdict parsing failed, defaulting to escalation for safety."}
 
 
@@ -111,11 +108,15 @@ def auto_suggest_fix(alert_message: str, matched_incident: PastIncident, distanc
     }
 
 
-def escalate(alert_message: str, reason: str) -> dict:
+def escalate(alert_message: str, reason: str, candidate: PastIncident = None, distance: float = None) -> dict:
     _send_slack_alert(alert_message, reason)
     return {
         "decision": "escalate",
         "alert": alert_message,
+        "matched_incident_id": candidate.id if candidate else None,
+        "matched_log": candidate.log_message if candidate else None,
+        "suggested_resolution": None,
+        "confidence_distance": round(distance, 4) if distance is not None else None,
         "reasoning": reason,
     }
 
@@ -124,25 +125,19 @@ def _send_slack_alert(alert_message: str, reason: str):
     if not SLACK_WEBHOOK_URL:
         print(f"[SLACK MOCK] Would escalate: {alert_message} | Reason: {reason}")
         return
-
-    payload = {
-        "text": f":rotating_light: *Incident Escalated*\n*Alert:* {alert_message}\n*Reason:* {reason}"
-    }
+    payload = {"text": f":rotating_light: *Incident Escalated*\n*Alert:* {alert_message}\n*Reason:* {reason}"}
     try:
         response = requests.post(SLACK_WEBHOOK_URL, json=payload, timeout=5)
         response.raise_for_status()
     except requests.RequestException as e:
-        # Network/webhook failure shouldn't crash the whole triage flow — log and move on
         print(f"[SLACK ERROR] Failed to send alert: {e}")
 
 
 if __name__ == "__main__":
     test_alerts = [
-        "Timeout connecting to Postgres primary node, retrying after 30s",   # should closely match seeded data
-        "Kubernetes pod stuck in CrashLoopBackOff due to unknown startup script error XZ992",  # likely novel
+        "Timeout connecting to Postgres primary node, retrying after 30s",
+        "Kubernetes pod stuck in CrashLoopBackOff due to unknown startup script error XZ992",
     ]
     for alert in test_alerts:
-        print(f"\n{'='*60}")
-        print(f"Alert: {alert}")
-        result = make_decision(alert)
-        print(json.dumps(result, indent=2))       
+        print(f"\n{'='*60}\nAlert: {alert}")
+        print(json.dumps(make_decision(alert), indent=2))
