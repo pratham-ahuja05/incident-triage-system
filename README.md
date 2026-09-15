@@ -55,17 +55,17 @@ This project is being built incrementally, day by day, with a focus on understan
 
 | Component | Status |
 | --- | --- |
-| FastAPI service (Python) — alert ingestion endpoint | ✅ Done |
-| LLM-based severity/category classification | ✅ Done |
-| RAG pipeline — embeddings + pgvector similarity search | ✅ Done |
-| Synthetic incident knowledge base (80 seeded incidents) | ✅ Done |
-| Agentic decision layer (hybrid threshold + LLM confidence) | ✅ Done |
-| Slack escalation webhook | ✅ Done |
-| Spring Boot ingestion API + Redis queue (producer/consumer) | ✅ Done |
-| Spring Boot ↔ Python service integration (WebClient) | ✅ Done |
-| End-to-end verified pipeline (Postman → Postgres) | ✅ Done |
-| React dashboard | 🔜 Planned |
-| Guardrails: rate limiting, human override, fallback hardening | 🔜 Planned |
+| FastAPI service (Python) — alert ingestion endpoint | Done |
+| LLM-based severity/category classification | Done |
+| RAG pipeline — embeddings + pgvector similarity search | Done |
+| Synthetic incident knowledge base (80 seeded incidents) | Done |
+| Agentic decision layer (hybrid threshold + LLM confidence) | Done |
+| Slack escalation webhook | Done |
+| Spring Boot ingestion API + Redis queue (producer/consumer) | Done |
+| Spring Boot ↔ Python service integration (WebClient) | Done |
+| End-to-end verified pipeline (Postman → Postgres) | Done |
+| React dashboard | Done |
+| Guardrails: rate limiting, human override, fallback hardening | Done |
 | Deployment (Render/Railway/Supabase/Vercel) | 🔜 Planned |
 
 ---
