@@ -1,7 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import Sidebar from "./components/Sidebar";
 import IssueList from "./components/IssueList";
 import IssueDetail from "./components/IssueDetail";
 import NewIssueModal from "./components/NewIssueModal";
+import AnalyticsView from "./components/AnalyticsView";
+import KnowledgeBaseView from "./components/KnowledgeBaseView";
 import "./App.css";
 
 const BASE = "http://localhost:8080/api";
@@ -14,7 +17,7 @@ const FILTERS = [
   { key: "FAILED", label: "Failed" },
 ];
 
-function App() {
+function BoardView() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,6 +25,7 @@ function App() {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const sseRef = useRef(null);
 
   const fetchAlerts = () => {
     fetch(`${BASE}/alerts`)
@@ -30,8 +34,7 @@ function App() {
         return res.json();
       })
       .then((data) => {
-        const sorted = data.reverse();
-        setAlerts(sorted);
+        setAlerts(data.reverse());
         setLoading(false);
         setError(null);
       })
@@ -43,12 +46,36 @@ function App() {
 
   useEffect(() => {
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 5000);
-    return () => clearInterval(interval);
+    // Real-time updates via SSE, with polling as a safety net
+    try {
+      const es = new EventSource(`${BASE}/alerts/stream`);
+      es.addEventListener("update", fetchAlerts);
+      es.onerror = () => es.close();
+      sseRef.current = es;
+    } catch {
+      // SSE unsupported/unavailable — polling below still covers it
+    }
+    const interval = setInterval(fetchAlerts, 8000);
+    return () => {
+      clearInterval(interval);
+      sseRef.current?.close();
+    };
   }, []);
 
   const handleReview = (triageResultId, decision) => {
     fetch(`${BASE}/triage-results/${triageResultId}/review?decision=${decision}`, { method: "POST" }).then(fetchAlerts);
+  };
+
+  const handleResolve = (triageResultId, resolutionNote) => {
+    return fetch(`${BASE}/triage-results/${triageResultId}/resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resolutionNote }),
+    }).then(fetchAlerts);
+  };
+
+  const handleRetry = (alertId) => {
+    fetch(`${BASE}/alerts/${alertId}/retry`, { method: "POST" }).then(fetchAlerts);
   };
 
   const handleSubmitIssue = ({ source, message }) => {
@@ -89,12 +116,9 @@ function App() {
   const selected = alerts.find((a) => a.id === selectedId) || null;
 
   return (
-    <div className="app">
+    <>
       <header className="topbar">
-        <div className="brand">
-          <span className="brand-dot" />
-          <span className="brand-name">Incident Triage</span>
-        </div>
+        <h1 className="view-title">Board</h1>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           Report issue
         </button>
@@ -139,16 +163,43 @@ function App() {
           {loading && <p className="empty-state">Loading…</p>}
           {error && <p className="empty-state empty-error">{error}</p>}
           {!loading && !error && filtered.length === 0 && <p className="empty-state">No issues match this view.</p>}
-          {!loading && !error && (
-            <IssueList alerts={filtered} selectedId={selectedId} onSelect={setSelectedId} />
-          )}
+          {!loading && !error && <IssueList alerts={filtered} selectedId={selectedId} onSelect={setSelectedId} onRetry={handleRetry} />}
         </div>
         <div className="board-right">
-          <IssueDetail alert={selected} onReview={handleReview} />
+          <IssueDetail alert={selected} onReview={handleReview} onResolve={handleResolve} />
         </div>
       </section>
 
       {showModal && <NewIssueModal onClose={() => setShowModal(false)} onSubmit={handleSubmitIssue} />}
+    </>
+  );
+}
+
+function App() {
+  const [view, setView] = useState("board");
+
+  return (
+    <div className="app-shell">
+      <Sidebar active={view} onNavigate={setView} />
+      <main className="main">
+        {view === "board" && <BoardView />}
+        {view === "analytics" && (
+          <>
+            <header className="topbar">
+              <h1 className="view-title">Analytics</h1>
+            </header>
+            <AnalyticsView />
+          </>
+        )}
+        {view === "knowledge" && (
+          <>
+            <header className="topbar">
+              <h1 className="view-title">Knowledge Base</h1>
+            </header>
+            <KnowledgeBaseView />
+          </>
+        )}
+      </main>
     </div>
   );
 }

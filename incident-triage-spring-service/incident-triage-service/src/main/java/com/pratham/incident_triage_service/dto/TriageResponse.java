@@ -5,7 +5,6 @@ import lombok.Data;
 
 @Data
 public class TriageResponse {
-
     private String decision;
     private String alert;
 
@@ -22,4 +21,6 @@ public class TriageResponse {
     private Double confidenceDistance;
 
     private String reasoning;
+    private String severity;
+    private String category;
 }

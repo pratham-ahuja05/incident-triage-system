@@ -30,12 +30,16 @@ public class TriageResult {
     private String reasoning;
 
     private Double confidenceDistance;
-
-    // NEW — populated whenever a candidate incident was retrieved, whether or not it was ultimately used
     private Long matchedIncidentId;
 
     @Column(columnDefinition = "TEXT")
     private String matchedLog;
+
+    private String severity;
+    private String category;
+
+    @Column(columnDefinition = "TEXT")
+    private String humanResolutionNote;
 
     @Column(nullable = false)
     private String humanReviewStatus = "PENDING_REVIEW";

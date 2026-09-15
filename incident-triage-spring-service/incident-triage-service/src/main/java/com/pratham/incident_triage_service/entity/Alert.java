@@ -24,7 +24,9 @@ public class Alert {
     private String message;
 
     @Column(nullable = false)
-    private String status; // PENDING, PROCESSING, COMPLETED, FAILED
+    private String status;
+
+    private int retryCount = 0;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

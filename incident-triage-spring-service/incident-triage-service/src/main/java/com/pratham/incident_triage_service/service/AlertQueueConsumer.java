@@ -20,18 +20,14 @@ import java.util.Optional;
 public class AlertQueueConsumer {
 
     private static final String QUEUE_KEY = "alert_queue";
+    private static final int MAX_RETRIES = 3;
 
-    @Autowired
-    private RedisTemplate<String, String> redisTemplate;
-
-    @Autowired
-    private AlertRepository alertRepository;
-
-    @Autowired
-    private TriageResultRepository triageResultRepository;
-
-    @Autowired
-    private WebClient webClient;
+    @Autowired private RedisTemplate<String, String> redisTemplate;
+    @Autowired private AlertRepository alertRepository;
+    @Autowired private TriageResultRepository triageResultRepository;
+    @Autowired private WebClient webClient;
+    @Autowired private AlertQueueProducer alertQueueProducer;
+    @Autowired private SseBroadcaster broadcaster;
 
     @Value("${python.service.url}")
     private String pythonServiceUrl;
@@ -48,12 +44,8 @@ public class AlertQueueConsumer {
             try {
                 String alertIdStr = redisTemplate.opsForList()
                         .rightPop(QUEUE_KEY, java.time.Duration.ofSeconds(5));
-
                 if (alertIdStr == null) continue;
-
-                Long alertId = Long.parseLong(alertIdStr);
-                processAlert(alertId);
-
+                processAlert(Long.parseLong(alertIdStr));
             } catch (Exception e) {
                 System.err.println("Consumer error: " + e.getMessage());
             }
@@ -61,41 +53,73 @@ public class AlertQueueConsumer {
     }
 
     private void processAlert(Long alertId) {
-    Optional<Alert> optionalAlert = alertRepository.findById(alertId);
-    if (optionalAlert.isEmpty()) return;
+        Optional<Alert> optionalAlert = alertRepository.findById(alertId);
+        if (optionalAlert.isEmpty()) return;
 
-    Alert alert = optionalAlert.get();
-    alert.setStatus("PROCESSING");
-    alertRepository.save(alert);
-
-    try {
-        Map<String, String> requestBody = new HashMap<>();
-        requestBody.put("log_message", alert.getMessage());
-
-        TriageResponse response = webClient.post()
-                .uri(pythonServiceUrl + "/triage")
-                .bodyValue(requestBody)
-                .retrieve()
-                .bodyToMono(TriageResponse.class)
-                .block();
-
-        TriageResult result = new TriageResult();
-        result.setAlertId(alertId);
-        result.setDecision(response.getDecision());
-        result.setSuggestedResolution(response.getSuggestedResolution());
-        result.setReasoning(response.getReasoning());
-        result.setConfidenceDistance(response.getConfidenceDistance());
-        result.setMatchedIncidentId(response.getMatchedIncidentId());
-        result.setMatchedLog(response.getMatchedLog());
-        triageResultRepository.save(result);
-
-        alert.setStatus("COMPLETED");
+        Alert alert = optionalAlert.get();
+        alert.setStatus("PROCESSING");
         alertRepository.save(alert);
+        broadcaster.broadcastUpdate();
 
-    } catch (Exception e) {
-        System.err.println("Failed to process alert " + alertId + ": " + e.getMessage());
-        alert.setStatus("FAILED");
-        alertRepository.save(alert);
+        try {
+            Map<String, String> requestBody = new HashMap<>();
+            requestBody.put("log_message", alert.getMessage());
+
+            TriageResponse response = webClient.post()
+                    .uri(pythonServiceUrl + "/triage")
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToMono(TriageResponse.class)
+                    .block();
+
+            TriageResult result = new TriageResult();
+            result.setAlertId(alertId);
+            result.setDecision(response.getDecision());
+            result.setSuggestedResolution(response.getSuggestedResolution());
+            result.setReasoning(response.getReasoning());
+            result.setConfidenceDistance(response.getConfidenceDistance());
+            result.setMatchedIncidentId(response.getMatchedIncidentId());
+            result.setMatchedLog(response.getMatchedLog());
+            result.setSeverity(response.getSeverity());
+            result.setCategory(response.getCategory());
+            triageResultRepository.save(result);
+
+            alert.setStatus("COMPLETED");
+            alert.setRetryCount(0);
+            alertRepository.save(alert);
+
+        } catch (Exception e) {
+            System.err.println("Failed to process alert " + alertId + ": " + e.getMessage());
+            handleFailure(alert);
+        }
+
+        broadcaster.broadcastUpdate();
     }
-}
+
+    private void handleFailure(Alert alert) {
+        int retries = alert.getRetryCount();
+        if (retries < MAX_RETRIES) {
+            alert.setRetryCount(retries + 1);
+            alert.setStatus("PENDING");
+            alertRepository.save(alert);
+            scheduleRetry(alert.getId(), retries + 1);
+        } else {
+            alert.setStatus("FAILED"); // dead-lettered — needs manual retry
+            alertRepository.save(alert);
+        }
+    }
+
+    // Exponential backoff: attempt 1 -> 2s, attempt 2 -> 4s, attempt 3 -> 8s
+    private void scheduleRetry(Long alertId, int attempt) {
+        long backoffMillis = (long) Math.pow(2, attempt) * 1000;
+        Thread retryThread = new Thread(() -> {
+            try {
+                Thread.sleep(backoffMillis);
+                alertQueueProducer.enqueue(alertId);
+            } catch (InterruptedException ignored) {
+            }
+        });
+        retryThread.setDaemon(true);
+        retryThread.start();
+    }
 }

@@ -11,6 +11,7 @@ public class AlertWithResult {
     private String source;
     private String message;
     private String status;
+    private int retryCount;
     private LocalDateTime createdAt;
 
     private Long triageResultId;
@@ -19,6 +20,9 @@ public class AlertWithResult {
     private String reasoning;
     private Double confidenceDistance;
     private String humanReviewStatus;
+    private String humanResolutionNote;
     private Long matchedIncidentId;
     private String matchedLog;
+    private String severity;
+    private String category;
 }
