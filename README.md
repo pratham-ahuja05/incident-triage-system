@@ -1,25 +1,27 @@
-# Autonomous Incident Triage System
+# IncidentSense — Autonomous Incident Triage System
 
-> A hybrid **Spring Boot + Python (FastAPI)** system that ingests production incident alerts, retrieves similar past incidents using RAG (Retrieval-Augmented Generation), and uses an agentic decision layer to either auto-suggest a fix or escalate to a human via Slack.
+> A hybrid **Spring Boot + Python (FastAPI)** system that ingests production incident alerts, retrieves semantically similar past incidents using vector search, and uses a hybrid decision layer to either auto-suggest a fix or escalate to a human — with JWT-based authentication and role-based access control securing every endpoint.
 
 ![Java](https://img.shields.io/badge/Java-17-007396?logo=openjdk&logoColor=white&style=flat-square)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-3-6DB33F?logo=springboot&logoColor=white&style=flat-square)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?logo=springboot&logoColor=white&style=flat-square)
+![Spring Security](https://img.shields.io/badge/Spring_Security-JWT-6DB33F?logo=springsecurity&logoColor=white&style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=flat-square)
 ![FastAPI](https://img.shields.io/badge/FastAPI-latest-009688?logo=fastapi&logoColor=white&style=flat-square)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white&style=flat-square)
 ![pgvector](https://img.shields.io/badge/pgvector-0.5-4169E1?logo=postgresql&logoColor=white&style=flat-square)
 ![Redis](https://img.shields.io/badge/Redis-latest-DC382D?logo=redis&logoColor=white&style=flat-square)
-![Groq](https://img.shields.io/badge/Groq-Llama_3.3_70B-F55036?style=flat-square)
+![Groq](https://img.shields.io/badge/Groq-LLM-F55036?style=flat-square)
 ![Docker](https://img.shields.io/badge/Docker-latest-2496ED?logo=docker&logoColor=white&style=flat-square)
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [What This Project Does](#what-this-project-does)
 - [Project Status](#project-status)
 - [Architecture](#architecture)
 - [Why This Architecture?](#why-this-architecture)
+- [Authentication & Authorization](#authentication--authorization)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [How the Decision Logic Works](#how-the-decision-logic-works)
@@ -28,6 +30,7 @@
 - [Running the Project](#running-the-project)
 - [API Reference](#api-reference)
 - [Architecture Decisions](#architecture-decisions)
+- [Known Limitations](#known-limitations)
 - [Roadmap](#roadmap)
 - [Author](#author)
 
@@ -39,34 +42,40 @@ When a production system throws an error, an on-call engineer usually has to man
 
 This system automates that first triage step:
 
-1. An alert (a raw log/error message) comes in through a REST API.
-2. It's queued and picked up asynchronously by an AI service.
-3. The AI service embeds the alert and searches a vector database of past resolved incidents for semantically similar cases (not just keyword matches).
-4. An agentic decision layer reasons over the retrieved matches and decides:
-   - **High confidence match found** → auto-suggest the fix that worked last time.
+1. An authenticated alert (a raw log/error message) comes in through a REST API.
+2. It's persisted and queued, then picked up asynchronously by a background consumer.
+3. A Python AI service embeds the alert and searches a vector database of past resolved incidents for semantically similar cases — not just keyword matches.
+4. A hybrid decision layer combines a cheap distance threshold with an LLM verification step to decide:
+   - **High-confidence match found** → auto-suggest the fix that worked last time.
    - **No good match / genuinely novel issue** → escalate to a human via Slack.
-5. The full decision — including the reasoning and the matched past incident — is persisted for later review.
+5. The full decision — including the reasoning, the matched past incident, and the confidence distance — is persisted for later review, and can be approved, rejected, or manually resolved by a human, feeding the outcome back into the knowledge base.
 
 ---
 
 ## Project Status
 
-This project is being built incrementally, day by day, with a focus on understanding every layer rather than scaffolding it with a template. Current status:
+Built incrementally, day by day, with a focus on understanding every layer rather than scaffolding it with a template.
 
 | Component | Status |
 | --- | --- |
-| FastAPI service (Python) — alert ingestion endpoint | Done |
+| FastAPI service (Python) — alert ingestion & classification | Done |
 | LLM-based severity/category classification | Done |
-| RAG pipeline — embeddings + pgvector similarity search | Done |
-| Synthetic incident knowledge base (80 seeded incidents) | Done |
-| Agentic decision layer (hybrid threshold + LLM confidence) | Done |
+| Retrieval pipeline — embeddings + pgvector cosine search | Done |
+| Synthetic incident knowledge base (LLM-seeded) | Done |
+| Hybrid decision layer (distance threshold + LLM verification) | Done |
 | Slack escalation webhook | Done |
 | Spring Boot ingestion API + Redis queue (producer/consumer) | Done |
 | Spring Boot ↔ Python service integration (WebClient) | Done |
-| End-to-end verified pipeline (Postman → Postgres) | Done |
-| React dashboard | Done |
-| Guardrails: rate limiting, human override, fallback hardening | Done |
-| Deployment (Render/Railway/Supabase/Vercel) | 🔜 Planned |
+| React dashboard (board, analytics, knowledge base views) | Done |
+| Rate limiting (Bucket4j) | Done |
+| **JWT authentication + role-based access control** | Done |
+| **Soft-delete / restore for alerts** | Done |
+| **Multi-field search with status filtering** | Done |
+| **Self-referencing duplicate linking** | Done |
+| Human review loop (approve/reject/resolve → feeds knowledge base) | Done |
+| Retry with exponential backoff | Done |
+| Deployment (Render/Railway/Supabase/Vercel) | Planned |
+| Redis Streams / delivery-guarantee hardening | Planned |
 
 ---
 
@@ -74,13 +83,13 @@ This project is being built incrementally, day by day, with a focus on understan
 
 ```mermaid
 flowchart LR
-    C[Client / Monitoring Tool] -->|POST /api/alerts| SB[Spring Boot REST API]
+    C[Client / Monitoring Tool] -->|JWT-authenticated POST /api/alerts| SB[Spring Boot REST API]
     SB -->|persist PENDING| PG[(PostgreSQL)]
     SB -->|LPUSH| R[(Redis Queue)]
-    R -->|BRPOP| CO[Spring Boot Consumer Thread]
+    R -->|BRPOP| CO[Consumer Thread]
     CO -->|POST /triage| PY[FastAPI AI Service]
     PY -->|embed + search| VEC[(pgvector: past_incidents)]
-    PY -->|reason over match| LLM[Groq LLM - Llama 3.3 70B]
+    PY -->|reason over match| LLM[Groq LLM]
     PY -->|low confidence| SLACK[Slack Webhook]
     PY -->|decision JSON| CO
     CO -->|persist result| PG
@@ -88,28 +97,51 @@ flowchart LR
 
 The system is split into two independently runnable services that share a single PostgreSQL database:
 
-- **Spring Boot** owns ingestion, queueing, orchestration, and persistence of the final decision.
-- **Python (FastAPI)** owns everything AI-related: embeddings, vector search, LLM reasoning, and the agentic decision.
+- **Spring Boot** owns ingestion, auth/RBAC, queueing, orchestration, and persistence of the final decision.
+- **Python (FastAPI)** owns everything AI-related: embeddings, vector search, LLM reasoning, and the decision logic.
 
 ---
 
 ## Why This Architecture?
 
 **Why hybrid Java + Python instead of one stack end-to-end?**
+Core business logic (auth, orchestration, persistence) sits in a statically-typed, enterprise-grade stack, while AI/ML-specific work uses the ecosystem actually built for it — mature libraries for embeddings, vector clients, and LLM SDKs. Each half plays to its stack's strengths.
 
-This mirrors a common real-world pattern (polyglot microservices): core business logic in a statically-typed, enterprise-grade stack (Java/Spring Boot), and AI/ML-specific work in the ecosystem that's actually built for it (Python — mature libraries for embeddings, pgvector clients, LLM SDKs). Each half of the system plays to its stack's strengths rather than forcing one language to do everything reasonably well.
+**Why Redis as a queue instead of a direct synchronous call?**
+LLM calls and vector search take anywhere from a few hundred milliseconds to a few seconds. A synchronous call would let a burst of alerts exhaust the web server's thread pool. Queueing decouples ingestion from processing: ingestion always responds fast (`202 Accepted`), and processing happens asynchronously.
 
-**Why Redis as a queue between ingestion and AI processing, instead of a direct synchronous call?**
+**Why pgvector instead of a dedicated vector database?**
+Incident data is relational as much as it is semantic. Keeping vectors inside PostgreSQL means relational and vector data can be joined directly, with one less moving part in the infrastructure. At this project's scale, operational simplicity outweighs the raw performance ceiling a dedicated vector store offers at much larger scale.
 
-LLM calls and vector search take anywhere from a few hundred milliseconds to a few seconds. If `POST /api/alerts` called the Python service synchronously and waited, a burst of incoming alerts would exhaust the web server's thread pool, and the ingestion API would become only as reliable as the (slower, LLM-dependent) AI service. Queueing decouples the two: ingestion always responds fast (`202 Accepted`), and processing happens asynchronously in the background. This is the same producer/consumer pattern used in the author's separate Distributed Job Queue project.
+**Why a hybrid threshold + LLM confidence check, instead of pure vector similarity or pure LLM judgment?**
+Distance is a cheap pre-filter that rejects clearly-unrelated alerts immediately; an LLM call is only spent reasoning about genuinely close candidates — cutting cost without sacrificing judgment on ambiguous cases.
 
-**Why pgvector instead of a dedicated vector database (Pinecone/Chroma/Weaviate)?**
+---
 
-The incident data is relational as much as it is semantic — source, timestamp, resolution status, and (eventually) foreign keys back to the Spring Boot side. Keeping vectors inside PostgreSQL means relational and vector data can be joined directly, with one less moving part in the infrastructure. At this project's scale (tens to low hundreds of incidents), the operational simplicity outweighs the raw performance ceiling a dedicated vector database would offer at much larger scale.
+## Authentication & Authorization
 
-**Why a hybrid threshold + LLM confidence check for the decision layer, instead of pure vector similarity or pure LLM judgment?**
+Every alert and triage-result endpoint is secured with stateless JWT authentication and role-based access control, mirroring the same pattern used in the author's Issue Management System project.
 
-Pure cosine-distance thresholding is fast and predictable but can be fooled by wording that's superficially close but semantically different (or vice versa). Pure LLM judgment on every alert is more "intelligent" but adds latency and cost to every single request, including obviously-unrelated ones. The hybrid approach uses distance as a cheap pre-filter to reject clearly-unrelated alerts immediately, and only spends an LLM call reasoning about genuinely close candidates — cutting cost without sacrificing judgment on ambiguous cases.
+**Roles**
+
+| Role | Permissions |
+| --- | --- |
+| **ADMIN** | Full access — create, read, update, delete/restore alerts |
+| **MANAGER** | Create, read, update alerts and triage results |
+| **ANALYST** | Create, read, update alerts; mark duplicates; retry failed alerts |
+| **VIEWER** | Read-only access to alerts, search, and analytics |
+
+**Flow**
+
+1. `POST /auth/register` creates a user with the default **VIEWER** role and returns a signed JWT.
+2. `POST /auth/login` authenticates credentials via Spring Security's `DaoAuthenticationProvider` and returns a JWT.
+3. Every subsequent request carries `Authorization: Bearer <token>`; a custom `OncePerRequestFilter` validates the token and populates the Spring Security context per-request (fully stateless — no server-side session).
+4. Endpoint-level rules (`SecurityConfig`) and method-level `@PreAuthorize` enforce role checks.
+
+**Security details**
+- Passwords hashed with BCrypt, never stored in plaintext.
+- JWT signed with HMAC-SHA512 using a secret sourced from an environment variable (`JWT_SECRET`) — no hardcoded fallback in production paths.
+- CORS restricted to the configured frontend origin(s).
 
 ---
 
@@ -118,8 +150,10 @@ Pure cosine-distance thresholding is fast and predictable but can be fooled by w
 **Backend (Spring Boot)**
 - Java 17, Spring Boot 3.x
 - Spring Web, Spring Data JPA (Hibernate)
+- Spring Security + JJWT (`0.12.x`) for stateless JWT authentication
 - Spring Data Redis
 - PostgreSQL driver
+- Bucket4j for rate limiting
 - Lombok
 - `WebClient` (Spring WebFlux) for calling the Python service
 
@@ -128,51 +162,68 @@ Pure cosine-distance thresholding is fast and predictable but can be fooled by w
 - Pydantic for request/response validation
 - SQLAlchemy + `pgvector` (Python package) for ORM + vector column support
 - `sentence-transformers` (`all-MiniLM-L6-v2`, 384-dim) for local embedding generation
-- Groq API (Llama 3.3 70B) for classification and agentic reasoning
+- Groq API for classification and decision verification
 - `requests` for Slack webhook calls
 
 **Infrastructure**
 - PostgreSQL 16 + pgvector extension (Dockerized)
 - Redis (Dockerized)
-- Docker Desktop for local infra
+- Docker for containerized deployment of both services
 
 ---
 
 ## Project Structure
 
 ```text
-Traige Project/
-├── ai-service/                          # Python — AI/RAG/agent layer
+Triage Project/
+├── ai-service/                          # Python — AI/retrieval/decision layer
 │   ├── main.py                          # FastAPI app + all routes
 │   ├── classifier.py                    # LLM-based severity/category classification
 │   ├── embeddings.py                    # Text → 384-dim vector via sentence-transformers
 │   ├── models.py                        # SQLAlchemy models (PastIncident) + DB session
 │   ├── seed_data.py                     # LLM-generated synthetic incident seeding script
 │   ├── retrieval.py                     # Top-k similar incident retrieval (cosine distance)
-│   ├── agent.py                         # Agentic decision layer: threshold + LLM confirmation
+│   ├── agent.py                         # Decision layer: threshold + LLM verification
 │   ├── requirements.txt
 │   └── .env                             # GROQ_API_KEY, DATABASE_URL, SLACK_WEBHOOK_URL
 │
 └── incident-triage-spring-service/
     └── incident-triage-service/
+        ├── Dockerfile
         └── src/main/java/com/pratham/incident_triage_service/
             ├── entity/
-            │   ├── Alert.java           # Raw ingested alert (status: PENDING/PROCESSING/COMPLETED/FAILED)
-            │   └── TriageResult.java    # Final decision, linked to Alert by alertId
+            │   ├── Alert.java              # Alert with status, soft-delete flag, self-referencing duplicates
+            │   └── TriageResult.java        # Final decision, linked to Alert by alertId
+            ├── model/
+            │   ├── User.java                # Auth user with many-to-many roles
+            │   ├── Role.java
+            │   └── RoleType.java             # ADMIN / MANAGER / ANALYST / VIEWER
             ├── repository/
-            │   ├── AlertRepository.java
-            │   └── TriageResultRepository.java
+            │   ├── AlertRepository.java      # Custom JPQL: findByIdWithDuplicates, searchActiveAlerts
+            │   ├── TriageResultRepository.java
+            │   ├── UserRepository.java
+            │   └── RoleRepository.java
             ├── dto/
-            │   ├── AlertRequest.java    # Inbound request DTO (validated)
-            │   └── TriageResponse.java  # Maps Python's snake_case JSON via @JsonProperty
+            │   ├── AlertRequest.java, TriageResponse.java, AlertWithResult.java
+            │   ├── LoginRequest.java, LoginResponse.java, RegisterRequest.java
+            │   └── MarkDuplicateRequest.java
             ├── controller/
-            │   └── AlertController.java # POST /api/alerts, GET /api/alerts/{id}
+            │   ├── AlertController.java      # ingest, search, retry, soft-delete, restore, mark-duplicate, SSE stream
+            │   ├── TriageResultController.java
+            │   ├── AnalyticsController.java
+            │   └── AuthController.java       # /auth/login, /auth/register
             ├── service/
-            │   ├── AlertQueueProducer.java  # LPUSH to Redis
-            │   └── AlertQueueConsumer.java  # Daemon thread: BRPOP → WebClient → persist
+            │   ├── AlertQueueProducer.java / AlertQueueConsumer.java
+            │   ├── SseBroadcaster.java
+            │   ├── AuthService.java
+            │   └── CustomUserDetailsService.java
+            ├── util/
+            │   ├── JwtTokenProvider.java
+            │   └── CustomUserDetails.java
             ├── config/
-            │   ├── RedisConfig.java     # RedisTemplate<String, String> bean
-            │   └── WebClientConfig.java # WebClient bean
+            │   ├── SecurityConfig.java, JwtAuthenticationFilter.java
+            │   ├── RedisConfig.java, WebClientConfig.java, RateLimitConfig.java
+            │   └── DataInitializationConfig.java   # seeds the four roles on startup
             └── IncidentTriageServiceApplication.java
 ```
 
@@ -183,9 +234,9 @@ Traige Project/
 For every alert, the AI service runs a two-stage decision process:
 
 1. **Retrieve** the single closest past incident from `past_incidents` using pgvector's cosine distance operator (`<=>`) against the alert's embedding.
-2. **Threshold pre-filter** — if the distance exceeds a tuned cutoff (currently `0.4`), the candidate is considered too dissimilar and the alert is escalated immediately, without spending an LLM call.
-3. **LLM confirmation** — if the candidate passes the threshold, the LLM is given both the new alert and the candidate incident and asked to judge, in its own reasoning, whether they're genuinely the same underlying issue. This catches cases where the vector search finds something numerically close but conceptually different.
-4. **Fail-safe default** — if the LLM's response can't be parsed as valid JSON, the system defaults to escalation rather than silently trusting an unverified match. Suggesting the wrong fix is worse than sending one extra alert to a human.
+2. **Threshold pre-filter** — if the distance exceeds a tuned cutoff (currently `0.4`), the candidate is too dissimilar and the alert is escalated immediately, without spending an LLM call.
+3. **LLM verification** — if the candidate passes the threshold, the LLM is given both the new alert and the candidate incident and asked to judge whether they're genuinely the same underlying issue. This catches cases where vector search finds something numerically close but conceptually different.
+4. **Fail-safe default** — if the LLM's response can't be parsed as valid JSON, the system defaults to escalation rather than trusting an unverified match.
 
 ```python
 DISTANCE_THRESHOLD = 0.4
@@ -209,18 +260,19 @@ def make_decision(alert_message: str) -> dict:
 
 Both services share a single PostgreSQL database (`triage_db`).
 
-**Owned by the Python AI service:**
+**Owned by the Python AI service**
 
 | Table | Purpose |
 | --- | --- |
 | `past_incidents` | Knowledge base of resolved incidents: `log_message`, `severity`, `category`, `resolution`, `embedding VECTOR(384)` |
 
-**Owned by the Spring Boot service:**
+**Owned by the Spring Boot service**
 
 | Table | Purpose |
 | --- | --- |
-| `alerts` | Raw ingested alerts with lifecycle status: `PENDING` → `PROCESSING` → `COMPLETED` / `FAILED` |
-| `triage_results` | Final decision per alert: `decision`, `suggested_resolution`, `reasoning`, `confidence_distance`, linked via `alertId` |
+| `alerts` | Ingested alerts with lifecycle status (`PENDING → PROCESSING → COMPLETED / FAILED`), soft-delete flag, and self-referencing duplicate links |
+| `triage_results` | Final decision per alert: `decision`, `suggested_resolution`, `reasoning`, `confidence_distance`, human review status, linked via `alertId` |
+| `users` / `roles` / `user_roles` | Authentication and role-based access control |
 
 ---
 
@@ -277,7 +329,8 @@ python seed_data.py
 
 ### Spring Boot Service
 
-Configure `src/main/resources/application.properties`:
+Set the following as environment variables (or in `application.properties`):
+
 ```properties
 spring.datasource.url=jdbc:postgresql://localhost:5432/triage_db
 spring.datasource.username=postgres
@@ -287,7 +340,13 @@ spring.data.redis.host=localhost
 spring.data.redis.port=6379
 python.service.url=http://localhost:8000
 server.port=8080
+
+jwt.secret=${JWT_SECRET}
+jwt.expiration=86400000
+app.cors.allowed-origins=http://localhost:5173
 ```
+
+> Generate a strong JWT secret with `openssl rand -base64 64` — do not use a hardcoded or predictable value.
 
 ---
 
@@ -309,29 +368,44 @@ Both services must be running simultaneously, along with the two Docker containe
 
 ## API Reference
 
-### Spring Boot (`localhost:8080`)
+### Auth (Spring Boot, `localhost:8080`)
 
-| Endpoint | Method | Description |
-| --- | --- | --- |
-| `/api/alerts` | `POST` | Ingest a new alert. Persists it, queues it, returns `202 Accepted` immediately. |
-| `/api/alerts/{id}` | `GET` | Fetch a single alert by ID. |
+| Endpoint | Method | Access | Description |
+| --- | --- | --- | --- |
+| `/auth/register` | `POST` | Public | Register a new user (default role: VIEWER) |
+| `/auth/login` | `POST` | Public | Authenticate and receive a JWT |
 
-**Example request:**
-```json
-POST /api/alerts
-{
-  "source": "payment-service",
-  "message": "Timeout connecting to Postgres primary node, retrying after 30s"
-}
-```
+### Alerts (Spring Boot, `localhost:8080`)
+
+| Endpoint | Method | Access | Description |
+| --- | --- | --- | --- |
+| `/api/alerts` | `POST` | ANALYST, MANAGER, ADMIN | Ingest a new alert — persists, queues, returns `202 Accepted` |
+| `/api/alerts` | `GET` | VIEWER+ | List all non-deleted alerts with their triage result |
+| `/api/alerts/{id}` | `GET` | VIEWER+ | Fetch a single alert |
+| `/api/alerts/search` | `GET` | VIEWER+ | Multi-field search (`source`, `message`) with optional status filter, paginated |
+| `/api/alerts/{id}/retry` | `POST` | ANALYST, MANAGER, ADMIN | Re-queue a failed alert |
+| `/api/alerts/{id}/mark-duplicate` | `POST` | ANALYST, MANAGER, ADMIN | Link an alert to another as a duplicate |
+| `/api/alerts/{id}` | `DELETE` | ADMIN | Soft-delete an alert |
+| `/api/alerts/{id}/restore` | `PUT` | ADMIN | Restore a soft-deleted alert |
+| `/api/alerts/stream` | `GET` | Public (SSE) | Server-sent events for real-time dashboard updates |
+
+### Triage Results & Analytics (Spring Boot, `localhost:8080`)
+
+| Endpoint | Method | Access | Description |
+| --- | --- | --- | --- |
+| `/api/triage-results/{id}/review` | `POST` | ANALYST, MANAGER, ADMIN | Approve/reject an auto-suggested fix; approved fixes are learned back into the knowledge base |
+| `/api/triage-results/{id}/resolve` | `POST` | ANALYST, MANAGER, ADMIN | Manually resolve an escalated alert and teach the knowledge base |
+| `/api/analytics` | `GET` | VIEWER+ | Aggregate stats — auto-fix rate, category/severity breakdown, pipeline health |
 
 ### Python AI Service (`localhost:8000`)
 
 | Endpoint | Method | Description |
 | --- | --- | --- |
-| `/health` | `GET` | Health check. |
-| `/alerts/classify` | `POST` | Classify a log message into severity + category. |
-| `/triage` | `POST` | Full RAG + agentic decision pipeline for a log message. Called internally by the Spring Boot consumer. |
+| `/health` | `GET` | Health check |
+| `/alerts/classify` | `POST` | Classify a log message into severity + category |
+| `/triage` | `POST` | Full retrieval + decision pipeline for a log message (called internally) |
+| `/incidents/learn` | `POST` | Add a human-verified resolution to the knowledge base |
+| `/incidents/search` | `GET` | Semantic search over the knowledge base |
 
 Interactive docs available at `localhost:8000/docs` (auto-generated Swagger UI).
 
@@ -339,22 +413,31 @@ Interactive docs available at `localhost:8000/docs` (auto-generated Swagger UI).
 
 ## Architecture Decisions
 
-- **Why FastAPI over Flask/Django?** — ASGI-based (via Starlette + Uvicorn), so I/O-bound work like LLM calls and DB queries doesn't block a worker thread the way a traditional WSGI framework would. Pydantic gives automatic request validation and free OpenAPI docs.
-- **Why Groq over OpenAI?** — Free tier with fast inference (LPU hardware), sufficient for a project at this scale, avoiding paid API costs during development.
-- **Why `sentence-transformers` locally instead of an embedding API?** — No per-call cost, works offline, and at this project's volume the latency difference versus an API call is negligible. It also demonstrates comfort running local ML inference, not just calling hosted APIs.
-- **Why store the raw cosine distance, not just the decision?** — Persisting `confidence_distance` alongside the decision makes the system's reasoning auditable after the fact — useful both for debugging threshold tuning and for eventually showing "why" in the dashboard.
-- **Why a hand-rolled agent loop instead of LangGraph?** — Building the state transitions manually first ensures the underlying mechanism (retrieve → threshold → LLM confirm → act) is fully understood before reaching for a framework that would otherwise abstract it away. A LangGraph version is a candidate follow-up once the core logic is solid.
-- **Why no `@ManyToOne` relationship between `Alert` and `TriageResult`?** — A plain `alertId` foreign key column was a deliberate simplicity trade-off; full JPA relationship mapping wasn't needed at this scale and would have added ORM overhead without a corresponding benefit.
+- **Why FastAPI over Flask/Django?** — ASGI-based, so I/O-bound work like LLM calls and DB queries doesn't block a worker thread the way a traditional WSGI framework would. Pydantic gives automatic request validation and free OpenAPI docs.
+- **Why Groq?** — Fast inference at low cost, sufficient for a project at this scale.
+- **Why `sentence-transformers` locally instead of an embedding API?** — No per-call cost, works offline, and the latency difference versus an API call is negligible at this volume.
+- **Why store the raw cosine distance, not just the decision?** — Persisting `confidence_distance` alongside the decision makes the system's reasoning auditable after the fact.
+- **Why JWT over session-based auth?** — Stateless tokens scale horizontally without server-side session storage, and match the pattern used across the author's other backend projects.
+- **Why no `@ManyToOne` relationship between `Alert` and `TriageResult`?** — A plain `alertId` foreign key column was a deliberate simplicity trade-off at this scale.
+
+---
+
+## Known Limitations
+
+- The knowledge base is bootstrapped from LLM-generated synthetic incidents, not real production data — no measured accuracy claim is made.
+- Queue delivery is at-most-once (`BRPOP` removes on read); a consumer crash mid-processing can leave an alert stuck in `PROCESSING`. Redis Streams with consumer-group acknowledgment is a planned hardening step.
+- The knowledge base does not currently distinguish seed data from human-approved learned entries.
+- Single-instance deployment; horizontal scaling of the consumer and SSE broadcaster would need Redis-backed coordination.
 
 ---
 
 ## Roadmap
 
-- [ ] **React dashboard** — list of alerts with their triage decision, confidence score, and the retrieved "why" (source incident).
-- [ ] **Guardrails** — human-in-the-loop override for auto-suggested fixes, rate limiting on ingestion, hardened fallback behavior when the LLM call fails outright (not just when it returns malformed JSON).
-- [ ] **Retry / dead-letter handling** — currently a failed alert is marked `FAILED` and not retried; a bounded-retry + DLQ pattern (reusing ideas from the author's Distributed Job Queue project) is planned.
-- [ ] **Deployment** — Spring Boot + Python services on Render/Railway, database on Supabase/Neon (pgvector-compatible), frontend on Vercel.
-- [ ] **LangGraph variant** — an alternative implementation of the agent using LangGraph, to compare against the hand-rolled state machine.
+- [ ] Redis Streams / delivery-guarantee hardening for the queue
+- [ ] Retry / dead-letter improvements beyond the current backoff-and-mark-failed behavior
+- [ ] Deployment: Spring Boot + Python on Render/Railway, database on Supabase/Neon, frontend on Vercel
+- [ ] HNSW index on the embedding column for larger-scale retrieval
+- [ ] Source-tagging (seed vs. human-approved) in the knowledge base
 
 ---
 
@@ -362,4 +445,4 @@ Interactive docs available at `localhost:8000/docs` (auto-generated Swagger UI).
 
 Built by **Pratham Ahuja** — B.E. Information Science & Engineering, NIE Mysore.
 
-This project is being built and documented incrementally as a learning exercise in Python, RAG pipelines, and agentic AI systems, on top of an existing Java/Spring Boot backend background.
+Built and documented incrementally as a learning project spanning Python, retrieval-based AI pipelines, and secure Spring Boot backend architecture.
