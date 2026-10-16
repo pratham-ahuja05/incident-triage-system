@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/analytics")
-@CrossOrigin(origins = "http://localhost:5173")
 public class AnalyticsController {
 
     @Autowired private AlertRepository alertRepository;
@@ -43,6 +42,21 @@ public class AnalyticsController {
         data.put("bySeverity", results.stream()
                 .filter(r -> r.getSeverity() != null)
                 .collect(Collectors.groupingBy(TriageResult::getSeverity, Collectors.counting())));
+
+        // Ticket workflow: status mix, SLA breaches, mean time to resolve
+        List<Alert> active = alerts.stream().filter(a -> !a.isDeleted()).toList();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        data.put("byTicketStatus", active.stream()
+                .collect(Collectors.groupingBy(a -> a.getTicketStatus() == null ? "OPEN" : a.getTicketStatus(), Collectors.counting())));
+        data.put("byPriority", active.stream().filter(a -> a.getPriority() != null)
+                .collect(Collectors.groupingBy(Alert::getPriority, Collectors.counting())));
+        data.put("overdue", active.stream()
+                .filter(a -> a.getDueAt() != null && a.getResolvedAt() == null && a.getDueAt().isBefore(now)).count());
+        OptionalDouble mttr = active.stream()
+                .filter(a -> a.getResolvedAt() != null)
+                .mapToDouble(a -> java.time.Duration.between(a.getCreatedAt(), a.getResolvedAt()).toMinutes() / 60.0)
+                .average();
+        data.put("mttrHours", mttr.isPresent() ? Math.round(mttr.getAsDouble() * 10.0) / 10.0 : null);
 
         data.put("byReviewStatus", results.stream()
                 .collect(Collectors.groupingBy(TriageResult::getHumanReviewStatus, Collectors.counting())));

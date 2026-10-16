@@ -1,0 +1,5 @@
+target
+.vscode
+.idea
+# never bake local secrets into an image
+src/main/resources/application-local.properties

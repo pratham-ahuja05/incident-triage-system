@@ -1,258 +1,248 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { Suspense, lazy, useState, useEffect, useMemo, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
-import IssueList from "./components/IssueList";
-import IssueDetail from "./components/IssueDetail";
+import BoardView from "./components/BoardView";
 import NewIssueModal from "./components/NewIssueModal";
-import AnalyticsView from "./components/AnalyticsView";
-import KnowledgeBaseView from "./components/KnowledgeBaseView";
 import AuthScreen from "./components/AuthScreen";
-import { IconMenu } from "./components/Icons";
-import {
-  API_ORIGIN,
-  canWrite,
-  clearSession,
-  fetchAlerts as fetchAlertsApi,
-  loadSession,
-  resolveIncident,
-  retryAlert,
-  reviewDecision,
-  saveSession,
-  submitAlert,
-} from "./api";
+import PageHeader from "./components/PageHeader";
+import Tour from "./components/Tour";
+import Welcome from "./components/Welcome";
+import ErrorBoundary from "./components/ErrorBoundary";
+import IssueDrawer from "./components/IssueDrawer";
+import CommandPalette from "./components/CommandPalette";
+import { ToastProvider } from "./components/Toast";
+import { useToast } from "./lib/toast";
+import { canWrite, clearSession, loadSession, saveSession } from "./api";
+import { useHashRoute, useServiceHealth, useTheme } from "./lib/hooks";
+import { useIncidentStore } from "./lib/store";
+import { DEMO_INCIDENT, TOUR_STEPS, hasOnboarded, markOnboarded } from "./lib/onboarding";
 import "./App.css";
 
-const FILTERS = [
-  { key: "all", label: "All" },
-  { key: "auto_suggest_fix", label: "Auto-fixed" },
-  { key: "escalate", label: "Escalated" },
-  { key: "pending", label: "In progress" },
-  { key: "FAILED", label: "Failed" },
-];
+// Secondary views load on demand to keep the first paint small.
+const KanbanView = lazy(() => import("./components/KanbanView"));
+const CalendarView = lazy(() => import("./components/CalendarView"));
+const AnalyticsView = lazy(() => import("./components/AnalyticsView"));
+const KnowledgeBaseView = lazy(() => import("./components/KnowledgeBaseView"));
 
-function BoardView({ writeAccess, onOpenNav }) {
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [filter, setFilter] = useState("all");
-  const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(null);
-  const [showModal, setShowModal] = useState(false);
-  const [live, setLive] = useState(false);
-  const [actionError, setActionError] = useState(null);
-  const sseRef = useRef(null);
+function isTypingTarget(el) {
+  return Boolean(el?.closest?.("input, textarea, select, [contenteditable='true'], dialog"));
+}
 
-  const refreshAlerts = useCallback(() => {
-    return fetchAlertsApi()
-      .then((data) => {
-        setAlerts(data);
-        setError(null);
+function Console({ session, onSignOut, theme, onToggleTheme }) {
+  const notify = useToast();
+  const [route, navigate] = useHashRoute();
+  const [navOpen, setNavOpen] = useState(false);
+  const health = useServiceHealth();
+  const store = useIncidentStore();
+  const writeAccess = canWrite(session);
+  const me = session.username;
+  const [onboarding, setOnboarding] = useState(() => (hasOnboarded(me) ? null : "welcome"));
+  const [reporting, setReporting] = useState(false);
+  const [palette, setPalette] = useState(false);
+
+  const openNav = () => setNavOpen(true);
+  // Incidents open in place: the list's detail pane on the board, a side drawer everywhere else.
+  const openIncident = useCallback(
+    (id) => navigate(["kanban", "calendar"].includes(route.view) ? route.view : "board", id),
+    [navigate, route.view]
+  );
+  const selectOnBoard = useCallback((id) => navigate("board", id), [navigate]);
+  const closeDrawer = useCallback(() => navigate(route.view), [navigate, route.view]);
+
+  const finishWelcome = () => {
+    markOnboarded(me);
+    setOnboarding(null);
+  };
+  const startTour = () => {
+    markOnboarded(me);
+    setOnboarding(null);
+    setNavOpen(false);
+    navigate("board");
+    // Let the board render before measuring tour targets.
+    setTimeout(() => setOnboarding("tour"), 350);
+  };
+
+  const report = ({ source, message }) =>
+    store.submit({ source, message }).then((saved) => {
+      if (saved?.id) openIncident(saved.id);
+      notify("Reported — watch it move through the pipeline");
+    });
+
+  const startDemo = () => {
+    finishWelcome();
+    store
+      .submit(DEMO_INCIDENT)
+      .then((saved) => {
+        if (saved?.id) navigate("board", saved.id);
+        notify("Demo incident created — watch each step light up");
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+      .catch((err) => notify(err.message, "danger"));
+  };
 
+  // Global shortcuts: Ctrl/Cmd+K quick search, n = new incident
   useEffect(() => {
-    refreshAlerts();
-    try {
-      const es = new EventSource(`${API_ORIGIN}/api/alerts/stream`);
-      es.addEventListener("update", refreshAlerts);
-      es.onopen = () => setLive(true);
-      es.onerror = () => {
-        setLive(false);
-        es.close();
-      };
-      sseRef.current = es;
-    } catch {
-      // EventSource unavailable — 8s polling still covers updates.
-    }
-    const interval = setInterval(refreshAlerts, 8000);
-    return () => {
-      clearInterval(interval);
-      sseRef.current?.close();
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPalette(true);
+        return;
+      }
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
+      if (e.key === "n" && writeAccess && !onboarding) {
+        e.preventDefault();
+        setReporting(true);
+      }
     };
-  }, [refreshAlerts]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [writeAccess, onboarding]);
 
-  const handleReview = (triageResultId, decision) => {
-    setActionError(null);
-    reviewDecision(triageResultId, decision)
-      .then(refreshAlerts)
-      .catch((err) => setActionError(err.message));
-  };
+  const sources = useMemo(() => [...new Set(store.alerts.map((a) => a.source))].sort(), [store.alerts]);
 
-  const handleResolve = (triageResultId, resolutionNote) => {
-    setActionError(null);
-    return resolveIncident(triageResultId, resolutionNote)
-      .then(refreshAlerts)
-      .catch((err) => {
-        setActionError(err.message);
-        throw err;
-      });
-  };
-
-  const handleRetry = (alertId) => {
-    setActionError(null);
-    retryAlert(alertId)
-      .then(refreshAlerts)
-      .catch((err) => setActionError(err.message));
-  };
-
-  const handleSubmitIssue = ({ source, message }) => submitAlert({ source, message }).then(refreshAlerts);
-
-  const stats = useMemo(() => {
-    const total = alerts.length;
-    const fixed = alerts.filter((a) => a.decision === "auto_suggest_fix").length;
-    const escalated = alerts.filter((a) => a.decision === "escalate").length;
-    const confidences = alerts.filter((a) => a.confidenceDistance != null).map((a) => a.confidenceDistance);
-    const avgConfidence = confidences.length
-      ? (confidences.reduce((a, b) => a + b, 0) / confidences.length).toFixed(3)
-      : "—";
-    return { total, fixed, escalated, avgConfidence };
-  }, [alerts]);
-
-  const counts = useMemo(
-    () => ({
-      all: alerts.length,
-      auto_suggest_fix: alerts.filter((a) => a.decision === "auto_suggest_fix").length,
-      escalate: alerts.filter((a) => a.decision === "escalate").length,
-      pending: alerts.filter((a) => !a.decision && a.status !== "FAILED").length,
-      FAILED: alerts.filter((a) => a.status === "FAILED").length,
-    }),
-    [alerts]
+  const paletteActions = useMemo(
+    () => [
+      { key: "go-board", group: "Go to", label: "Triage queue", run: () => navigate("board") },
+      { key: "go-kanban", group: "Go to", label: "Kanban board", run: () => navigate("kanban") },
+      { key: "go-calendar", group: "Go to", label: "Calendar", run: () => navigate("calendar") },
+      { key: "go-analytics", group: "Go to", label: "Analytics", run: () => navigate("analytics") },
+      { key: "go-kb", group: "Go to", label: "Knowledge base", run: () => navigate("knowledge") },
+      ...(writeAccess
+        ? [{ key: "new", group: "Create", label: "Report an incident", hint: "n", run: () => setReporting(true) }]
+        : []),
+      { key: "help", group: "Help", label: "How it works", run: () => setOnboarding("welcome") },
+      { key: "theme", group: "Settings", label: `Switch to ${theme === "light" ? "dark" : "light"} theme`, run: onToggleTheme },
+    ],
+    [navigate, writeAccess, theme, onToggleTheme]
   );
 
-  const filtered = useMemo(() => {
-    return alerts.filter((a) => {
-      const matchesQuery =
-        !query ||
-        a.message.toLowerCase().includes(query.toLowerCase()) ||
-        a.source.toLowerCase().includes(query.toLowerCase());
-      if (!matchesQuery) return false;
-      if (filter === "all") return true;
-      if (filter === "pending") return !a.decision && a.status !== "FAILED";
-      if (filter === "FAILED") return a.status === "FAILED";
-      return a.decision === filter;
-    });
-  }, [alerts, filter, query]);
-
-  const selected = alerts.find((a) => a.id === selectedId) || null;
+  const drawerOpen = ["kanban", "calendar"].includes(route.view) && route.id;
+  const drawerAlert = drawerOpen ? store.alerts.find((a) => a.id === route.id) || null : null;
+  const detailProps = {
+    onReview: store.review,
+    onResolve: store.resolve,
+    onRetry: store.retry,
+    onUpdate: store.update,
+    onInvestigate: store.investigate,
+    onCloseDuplicate: store.closeAsDuplicate,
+    users: store.users,
+    me,
+    refreshKey: store.lastUpdated,
+    canWrite: writeAccess,
+  };
 
   return (
-    <>
-      <header className="topbar">
-        <div className="topbar-left">
-          <button type="button" className="menu-toggle" onClick={onOpenNav} aria-label="Open navigation">
-            <IconMenu />
-          </button>
-          <div>
-            <h1 className="view-title">Board</h1>
-            <p className="view-sub">Live triage queue for ingested alerts.</p>
-            <span className="live-badge">
-              <span className={`live-dot ${live ? "" : "poll"}`} />
-              {live ? "Live updates" : "Polling every 8s"}
-            </span>
-          </div>
-        </div>
-        {writeAccess && (
-          <button type="button" className="btn btn-primary" onClick={() => setShowModal(true)}>
-            Report issue
-          </button>
-        )}
-      </header>
+    <div className="app-shell">
+      <Sidebar
+        active={route.view}
+        onNavigate={(view) => {
+          navigate(view);
+          setNavOpen(false);
+        }}
+        session={session}
+        onSignOut={onSignOut}
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+        health={health}
+        canWrite={writeAccess}
+        onReport={() => {
+          setNavOpen(false);
+          setReporting(true);
+        }}
+        onSearch={() => {
+          setNavOpen(false);
+          setPalette(true);
+        }}
+        onHelp={() => {
+          setNavOpen(false);
+          setOnboarding("welcome");
+        }}
+      />
+      <main className="main">
+        <ErrorBoundary key={route.view}>
+          <Suspense fallback={<p className="empty-state">Loading…</p>}>
+            {route.view === "board" && (
+              <BoardView
+                store={store}
+                live={store.live}
+                writeAccess={writeAccess}
+                me={me}
+                onOpenNav={openNav}
+                selectedId={route.id}
+                onSelect={selectOnBoard}
+                onReport={() => setReporting(true)}
+                onDemo={startDemo}
+                onStartTour={startTour}
+              />
+            )}
+            {route.view === "kanban" && (
+              <>
+                <PageHeader
+                  title="Kanban board"
+                  subtitle="Drag incidents through the workflow. Highest priority first in each column."
+                  onOpenNav={openNav}
+                />
+                <KanbanView store={store} me={me} canWrite={writeAccess} selectedId={route.id} onOpen={openIncident} />
+              </>
+            )}
+            {route.view === "calendar" && (
+              <>
+                <PageHeader
+                  title="Calendar"
+                  subtitle="When incidents were reported and when their SLA is due."
+                  onOpenNav={openNav}
+                />
+                <CalendarView store={store} onOpen={openIncident} />
+              </>
+            )}
+            {route.view === "analytics" && (
+              <>
+                <PageHeader title="Analytics" subtitle="Volume, outcomes, SLA and review health." onOpenNav={openNav} />
+                <AnalyticsView />
+              </>
+            )}
+            {route.view === "knowledge" && (
+              <>
+                <PageHeader
+                  title="Knowledge Base"
+                  subtitle="Semantic search over past resolved incidents."
+                  onOpenNav={openNav}
+                />
+                <KnowledgeBaseView aiStatus={health.ai} />
+              </>
+            )}
+          </Suspense>
+        </ErrorBoundary>
+      </main>
 
-      {!writeAccess && (
-        <p className="role-note">
-          You are signed in as a Viewer. Reporting, retry, approval, and resolution require Analyst, Manager, or Admin.
-        </p>
-      )}
-
-      <section className="stats">
-        <div className="stat">
-          <span className="stat-value">{stats.total}</span>
-          <span className="stat-label">Total issues</span>
-        </div>
-        <div className="stat">
-          <span className="stat-value stat-success">{stats.fixed}</span>
-          <span className="stat-label">Auto-resolved</span>
-        </div>
-        <div className="stat">
-          <span className="stat-value stat-danger">{stats.escalated}</span>
-          <span className="stat-label">Escalated</span>
-        </div>
-        <div className="stat">
-          <span className="stat-value">{stats.avgConfidence}</span>
-          <span className="stat-label">Avg. match distance</span>
-        </div>
-      </section>
-
-      <section className="toolbar">
-        <input
-          className="search"
-          placeholder="Search source or message…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label="Search issues"
+      {drawerOpen && (
+        <IssueDrawer
+          alert={drawerAlert}
+          missingId={!store.loading && !drawerAlert ? route.id : null}
+          onClose={closeDrawer}
+          {...detailProps}
         />
-        <div className="filters" role="tablist" aria-label="Issue filters">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              className={`filter-chip ${filter === f.key ? "filter-chip-active" : ""}`}
-              onClick={() => setFilter(f.key)}
-              aria-selected={filter === f.key}
-            >
-              {f.label}
-              <span className="filter-count">{counts[f.key]}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="board">
-        <div className="board-left">
-          {loading && (
-            <>
-              <div className="skeleton skeleton-row" />
-              <div className="skeleton skeleton-row" />
-              <div className="skeleton skeleton-row" />
-            </>
-          )}
-          {error && <p className="empty-state empty-error">{error}</p>}
-          {!loading && !error && filtered.length === 0 && (
-            <p className="empty-state">No issues match this view.</p>
-          )}
-          {!loading && !error && (
-            <IssueList
-              alerts={filtered}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onRetry={handleRetry}
-              canRetry={writeAccess}
-            />
-          )}
-        </div>
-        <div className={`board-right ${selected ? "open" : ""}`}>
-          <IssueDetail
-            key={selected ? selected.id : "empty"}
-            alert={selected}
-            onReview={handleReview}
-            onResolve={handleResolve}
-            onBack={() => setSelectedId(null)}
-            canWrite={writeAccess}
-            actionError={actionError}
-          />
-        </div>
-      </section>
-
-      {showModal && <NewIssueModal onClose={() => setShowModal(false)} onSubmit={handleSubmitIssue} />}
-    </>
+      )}
+      {reporting && <NewIssueModal onClose={() => setReporting(false)} onSubmit={report} sources={sources} />}
+      {palette && (
+        <CommandPalette
+          alerts={store.alerts}
+          actions={paletteActions}
+          onOpenIncident={openIncident}
+          onClose={() => setPalette(false)}
+        />
+      )}
+      {onboarding === "welcome" && (
+        <Welcome session={session} canWrite={writeAccess} onTour={startTour} onDemo={startDemo} onClose={finishWelcome} />
+      )}
+      {onboarding === "tour" && <Tour steps={TOUR_STEPS} onClose={() => setOnboarding(null)} />}
+    </div>
   );
 }
 
 function App() {
-  const [view, setView] = useState("board");
   const [session, setSession] = useState(() => loadSession());
-  const [navOpen, setNavOpen] = useState(false);
+  const [theme, toggleTheme] = useTheme();
 
   useEffect(() => {
     const onUnauthorized = () => setSession(null);
@@ -270,63 +260,14 @@ function App() {
     setSession(null);
   };
 
-  const navigate = (next) => {
-    setView(next);
-    setNavOpen(false);
-  };
-
-  if (!session?.token) {
-    return <AuthScreen onAuthenticated={authenticate} />;
-  }
-
-  const writeAccess = canWrite(session);
-
   return (
-    <div className="app-shell">
-      <Sidebar
-        active={view}
-        onNavigate={navigate}
-        session={session}
-        onSignOut={signOut}
-        open={navOpen}
-        onClose={() => setNavOpen(false)}
-      />
-      <main className="main">
-        {view === "board" && <BoardView writeAccess={writeAccess} onOpenNav={() => setNavOpen(true)} />}
-        {view === "analytics" && (
-          <>
-            <header className="topbar">
-              <div className="topbar-left">
-                <button type="button" className="menu-toggle" onClick={() => setNavOpen(true)} aria-label="Open navigation">
-                  <IconMenu />
-                </button>
-                <div>
-                  <h1 className="view-title">Analytics</h1>
-                  <p className="view-sub">Pipeline volume, outcomes, and review health.</p>
-                </div>
-              </div>
-            </header>
-            <AnalyticsView />
-          </>
-        )}
-        {view === "knowledge" && (
-          <>
-            <header className="topbar">
-              <div className="topbar-left">
-                <button type="button" className="menu-toggle" onClick={() => setNavOpen(true)} aria-label="Open navigation">
-                  <IconMenu />
-                </button>
-                <div>
-                  <h1 className="view-title">Knowledge Base</h1>
-                  <p className="view-sub">Semantic search over past resolved incidents.</p>
-                </div>
-              </div>
-            </header>
-            <KnowledgeBaseView />
-          </>
-        )}
-      </main>
-    </div>
+    <ToastProvider>
+      {session?.token ? (
+        <Console session={session} onSignOut={signOut} theme={theme} onToggleTheme={toggleTheme} />
+      ) : (
+        <AuthScreen onAuthenticated={authenticate} />
+      )}
+    </ToastProvider>
   );
 }
 

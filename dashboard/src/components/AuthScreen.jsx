@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { IconMark } from "./Icons";
-import { loginRequest, registerRequest } from "../api";
+import { DEMO_LOGIN, loginRequest, registerRequest } from "../api";
+
+// Seeded by DataInitializationConfig.java — local demo only.
+const DEMO_ACCOUNTS = [
+  { username: "admin", role: "Admin" },
+  { username: "analyst", role: "Analyst" },
+  { username: "viewer", role: "Viewer" },
+];
+const DEMO_PASSWORD = "password123";
 
 function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState("login");
@@ -9,23 +17,34 @@ function AuthScreen({ onAuthenticated }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const isRegister = mode === "register";
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const authenticate = async (user, pass) => {
     setError("");
     setSubmitting(true);
     try {
       const session = isRegister
-        ? await registerRequest(username.trim(), email.trim(), password)
-        : await loginRequest(username.trim(), password);
+        ? await registerRequest(user.trim(), email.trim(), pass)
+        : await loginRequest(user.trim(), pass);
       onAuthenticated(session);
     } catch (err) {
       setError(err.message || "Authentication failed.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    authenticate(username, password);
+  };
+
+  const signInAsDemo = (account) => {
+    setUsername(account.username);
+    setPassword(DEMO_PASSWORD);
+    authenticate(account.username, DEMO_PASSWORD);
   };
 
   return (
@@ -41,7 +60,7 @@ function AuthScreen({ onAuthenticated }) {
         </p>
         <ul className="auth-points">
           <li>RAG search over the incident knowledge base</li>
-          <li>Agentic decide: auto-fix or escalate to Slack</li>
+          <li>AI suggests a proven fix or escalates — people approve</li>
           <li>Human review feeds confirmed resolutions back in</li>
         </ul>
       </section>
@@ -83,9 +102,14 @@ function AuthScreen({ onAuthenticated }) {
           )}
 
           <label className="field">
-            <span>Password</span>
+            <span className="field-label-row">
+              Password
+              <button type="button" className="link-btn" onClick={() => setShowPassword((v) => !v)} aria-pressed={showPassword}>
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </span>
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={isRegister ? "new-password" : "current-password"}
@@ -110,6 +134,25 @@ function AuthScreen({ onAuthenticated }) {
           >
             {isRegister ? "Already have an account? Sign in" : "Need an account? Register"}
           </button>
+
+          {!isRegister && DEMO_LOGIN && (
+            <div className="demo-accounts">
+              <span className="detail-label">Demo accounts</span>
+              <div className="demo-buttons">
+                {DEMO_ACCOUNTS.map((account) => (
+                  <button
+                    key={account.username}
+                    type="button"
+                    className="btn btn-small"
+                    onClick={() => signInAsDemo(account)}
+                    disabled={submitting}
+                  >
+                    {account.role}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </form>
       </div>
     </div>

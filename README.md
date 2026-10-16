@@ -26,7 +26,8 @@
 - [Project Structure](#project-structure)
 - [How the Decision Logic Works](#how-the-decision-logic-works)
 - [Database Schema](#database-schema)
-- [Installation](#installation)
+- [Deployment (Docker Compose)](#deployment-docker-compose)
+- [Local Development](#local-development)
 - [Running the Project](#running-the-project)
 - [API Reference](#api-reference)
 - [Architecture Decisions](#architecture-decisions)
@@ -276,12 +277,41 @@ Both services share a single PostgreSQL database (`triage_db`).
 
 ---
 
-## Installation
+## Deployment (Docker Compose)
+
+The whole stack — Postgres + pgvector, Redis, the Python AI service, the Spring Boot API and the dashboard — starts with one command. The dashboard's nginx serves the UI and proxies `/api`, `/auth` and `/ai` to the backends, so only one port is exposed and no CORS setup is needed.
+
+```bash
+cp .env.example .env          # then fill in POSTGRES_PASSWORD, GROQ_API_KEY, JWT_SECRET
+docker compose up -d --build
+```
+
+Open **http://localhost** (or the `WEB_PORT` you set). On a server, point your domain / TLS-terminating proxy at that port.
+
+**Seed the knowledge base once** (otherwise every alert escalates, because there is nothing to match against):
+
+```bash
+docker compose exec ai python seed_data.py
+```
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `POSTGRES_PASSWORD` | yes | Database password (shared by both services) |
+| `GROQ_API_KEY` | yes | LLM used for match verification and classification |
+| `JWT_SECRET` | yes | Signs login tokens — `openssl rand -base64 64` |
+| `SLACK_WEBHOOK_URL` | no | Escalations are posted here; logged only when empty |
+| `SEED_DEMO_USERS` | no (default `true`) | Creates the demo accounts below and shows the one-click demo login. Set `false` for a private deployment |
+| `WEB_PORT` | no (default `80`) | Host port for the dashboard |
+
+---
+
+## Local Development
 
 ### Prerequisites
 
-- Java 17+, Maven
+- Java 17+
 - Python 3.10+
+- Node.js 20+
 - Docker Desktop
 - A Groq API key ([console.groq.com](https://console.groq.com))
 - (Optional) A Slack app with an Incoming Webhook
@@ -289,80 +319,81 @@ Both services share a single PostgreSQL database (`triage_db`).
 ### Infrastructure (Docker)
 
 ```bash
-docker run --name triage-postgres -e POSTGRES_PASSWORD=<password> -p 5432:5432 -d pgvector/pgvector:pg16
+docker run --name triage-postgres -e POSTGRES_PASSWORD=<password> -e POSTGRES_DB=triage_db -p 5432:5432 -d pgvector/pgvector:pg16
 docker run --name triage-redis -p 6379:6379 -d redis
 ```
 
-Enable the `vector` extension inside the database:
+After a reboot: `docker start triage-postgres triage-redis`.
+
+### AI Service (Python) — project root, port 8000
 
 ```bash
-docker exec -it triage-postgres psql -U postgres
-```
-```sql
-CREATE DATABASE triage_db;
-\c triage_db
-CREATE EXTENSION vector;
-```
-
-### AI Service (Python)
-
-```bash
-cd ai-service
 python -m venv venv
 venv\Scripts\Activate.ps1     # Windows
 # source venv/bin/activate    # Mac/Linux
 pip install -r requirements.txt
 ```
 
-Create `ai-service/.env`:
+Create `.env` in the project root (see `.env.example`):
 ```env
 GROQ_API_KEY=your_key_here
 DATABASE_URL=postgresql://postgres:<password>@localhost:5432/triage_db
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your/webhook/url
+SLACK_WEBHOOK_URL=
 ```
 
-Create tables and seed the knowledge base:
+The `vector` extension and `past_incidents` table are created automatically on startup. Seed the knowledge base once:
 ```bash
-python models.py
 python seed_data.py
 ```
 
-### Spring Boot Service
+### Spring Boot Service — port 8080
 
-Set the following as environment variables (or in `application.properties`):
+Configuration comes from environment variables with local defaults (see `application.properties`). For your local DB password, create the git-ignored file `src/main/resources/application-local.properties`:
 
 ```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/triage_db
-spring.datasource.username=postgres
 spring.datasource.password=<password>
-spring.jpa.hibernate.ddl-auto=update
-spring.data.redis.host=localhost
-spring.data.redis.port=6379
-python.service.url=http://localhost:8000
-server.port=8080
-
-jwt.secret=${JWT_SECRET}
-jwt.expiration=86400000
-app.cors.allowed-origins=http://localhost:5173
 ```
 
-> Generate a strong JWT secret with `openssl rand -base64 64` — do not use a hardcoded or predictable value.
+> In production always set `JWT_SECRET` (`openssl rand -base64 64`) and `SEED_DEMO_USERS=false` unless you want public demo accounts.
+
+### Dashboard — port 5173
+
+```bash
+cd dashboard
+npm install
+cp .env.example .env
+```
 
 ---
 
 ## Running the Project
 
-**AI Service** (from `ai-service/`):
+Use one terminal per service:
+
 ```bash
+# 1. AI service (project root, venv active)
 uvicorn main:app --reload --port 8000
+
+# 2. Spring Boot (incident-triage-spring-service/incident-triage-service)
+./mvnw clean spring-boot:run        # Windows: .\mvnw.cmd clean spring-boot:run
+
+# 3. Dashboard (dashboard/)
+npm run dev
 ```
 
-**Spring Boot Service** — run `IncidentTriageServiceApplication` from your IDE, or:
-```bash
-./mvnw spring-boot:run
-```
+Open http://localhost:5173. First-time users get a short walkthrough of the triage pipeline, a guided tour of the console, and a one-click demo incident; reopen it any time from **How it works** in the sidebar.
 
-Both services must be running simultaneously, along with the two Docker containers.
+> Run Spring from either your IDE or Maven, not both — a second instance fails with "Port 8080 already in use".
+
+### Demo Credentials
+
+Three users are seeded by `DataInitializationConfig.java` on startup when `SEED_DEMO_USERS` is `true` (the default; skipped if they already exist):
+
+| Username | Password | Role |
+| --- | --- | --- |
+| `admin` | `password123` | ADMIN — full access |
+| `analyst` | `password123` | ANALYST — create/review alerts |
+| `viewer` | `password123` | VIEWER — read-only |
 
 ---
 
@@ -395,7 +426,29 @@ Both services must be running simultaneously, along with the two Docker containe
 | --- | --- | --- | --- |
 | `/api/triage-results/{id}/review` | `POST` | ANALYST, MANAGER, ADMIN | Approve/reject an auto-suggested fix; approved fixes are learned back into the knowledge base |
 | `/api/triage-results/{id}/resolve` | `POST` | ANALYST, MANAGER, ADMIN | Manually resolve an escalated alert and teach the knowledge base |
-| `/api/analytics` | `GET` | VIEWER+ | Aggregate stats — auto-fix rate, category/severity breakdown, pipeline health |
+| `/api/analytics` | `GET` | VIEWER+ | Aggregate stats — auto-fix rate, category/severity/priority/status breakdown, SLA overdue count, mean time to resolve |
+
+### Ticket Workflow (Spring Boot, `localhost:8080`)
+
+Every incident is also a Jira-style ticket: **To do → In progress → In review → Resolved → Closed**, with a priority (P1–P4), an assignee, labels and an SLA due date. Priority is derived from the AI's severity at triage time (critical → P1 … low → P4) and the due date from priority (P1 4 h, P2 1 day, P3 3 days, P4 7 days). Approving an AI fix or recording a resolution moves the ticket to Resolved; assigning an untouched ticket moves it to In progress. Every change is written to the incident's activity log.
+
+| Endpoint | Method | Access | Description |
+| --- | --- | --- | --- |
+| `/api/alerts/{id}` | `PATCH` | ANALYST, MANAGER, ADMIN | Update any of `ticketStatus`, `priority`, `assignee`, `dueAt`, `labels` |
+| `/api/alerts/{id}/activity` | `GET` | VIEWER+ | Comments and full change history, oldest first |
+| `/api/alerts/{id}/comments` | `POST` | VIEWER+ | Add a comment (`{"body": "..."}`) |
+| `/api/users` | `GET` | VIEWER+ | People who can be assigned |
+| `/api/alerts/{id}/investigation` | `POST` | ANALYST, MANAGER, ADMIN | Run/re-run the AI investigation; result is stored on the incident |
+| `/api/alerts/{id}/duplicates` | `GET` | VIEWER+ | Possible duplicates: same service, same message pattern (numbers/IDs masked), within 7 days |
+| `/api/alerts/{id}/mark-duplicate` | `POST` | ANALYST, MANAGER, ADMIN | Close this incident as a duplicate of `{"duplicateId": originalId}` |
+
+### AI investigation and stage telemetry
+
+- **Investigation** (`POST /investigate` on the AI service): a summary, up to three root-cause hypotheses, remediation steps and open questions. The model only sees past incidents that vector search actually returned, and evidence references to anything else are removed in code. Hypothesis likelihood is the model's own judgement and is labelled as such. Remediation steps carry a risk level (`safe` / `caution` / `destructive`) and are never executed. Provider outages and rate limits return a clear 503/429 instead of a generic error.
+- **Stage timing**: the AI service reports how long retrieval, the LLM check and classification took; the worker logs when it picks an alert up. The dashboard's pipeline stages are clickable and show these recorded values — incidents processed before this was added say "not recorded" rather than showing estimates. The LLM check is skipped (and shown as skipped) when no past incident is close enough to verify.
+- A suggested fix is never treated as a fix: the incident stays open until a person approves it.
+
+The dashboard shows these as a **Triage queue** (list + detail), a drag-and-drop **Kanban board**, a **Calendar** of reported and due dates, and **Ctrl + K** quick search.
 
 ### Python AI Service (`localhost:8000`)
 

@@ -1,4 +1,8 @@
-from fastapi import FastAPI
+import os
+import time
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -6,13 +10,21 @@ from datetime import datetime
 from classifier import classify_incident
 from agent import make_decision
 from embeddings import generate_embedding
-from models import SessionLocal, PastIncident
+from investigation import LLMUnavailable, investigate
+from models import SessionLocal, PastIncident, init_db
 
-app = FastAPI(title="Incident Triage AI Service")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    init_db()  # idempotent: pgvector extension + past_incidents table
+    yield
+
+
+app = FastAPI(title="Incident Triage AI Service", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -81,10 +93,28 @@ async def classify_alert(request: ClassifyRequest):
 @app.post("/triage")
 async def triage_alert(request: TriageRequest):
     result = make_decision(request.log_message)
+    t = time.perf_counter()
     classification = classify_incident(request.log_message)
+    result["timings_ms"]["classify"] = int((time.perf_counter() - t) * 1000)
     result["severity"] = classification.get("severity", "unknown")
     result["category"] = classification.get("category", "unknown")
     return result
+
+
+class InvestigateRequest(BaseModel):
+    log_message: str = Field(..., min_length=1, max_length=5000)
+    source: str = "unknown"
+
+
+# Explainable investigation: summary, root-cause hypotheses tied to real evidence, remediation with risk levels.
+@app.post("/investigate")
+def investigate_incident(request: InvestigateRequest):
+    try:
+        return investigate(request.log_message, request.source)
+    except LLMUnavailable as e:
+        raise HTTPException(status_code=429 if e.rate_limited else 503, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=f"The AI returned an unusable answer: {e}")
 
 
 # Feature 1 — feedback loop: teach the knowledge base a newly resolved incident

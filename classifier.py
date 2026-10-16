@@ -1,11 +1,5 @@
-import os
 import json
-from dotenv import load_dotenv
-from groq import Groq
-
-load_dotenv()
-
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+from llm import chat_json
 
 
 CLASSIFICATION_PROMPT = """You are an SRE assistant classifying production incident logs.
@@ -26,30 +20,13 @@ def classify_incident(log_message: str) -> dict:
     prompt = CLASSIFICATION_PROMPT.format(log_message=log_message)
 
     try:
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            max_tokens=200,
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            timeout=10
-        )
+        result = chat_json(prompt)
     except Exception as e:
-        # LLM API call itself failed (network, timeout, rate limit, service down)
-        print(f"[LLM ERROR] API call failed: {e}")
-        return {"severity": "unknown", "category": "unknown", "reasoning": "api_call_failed"}
+        # API failure (network, timeout, rate limit) or unparseable output
+        print(f"[LLM ERROR] classification failed: {type(e).__name__}: {e}")
+        return {"severity": "unknown", "category": "unknown", "reasoning": "llm_failed"}
 
-    raw_text = response.choices[0].message.content.strip()
-
-    if raw_text.startswith("```"):
-        raw_text = raw_text.strip("`").replace("json", "", 1).strip()
-
-    try:
-        result = json.loads(raw_text)
-        # Sanity check: valid JSON but wrong/missing keys should also fall back safely
-        if not all(k in result for k in ("severity", "category", "reasoning")):
-            raise ValueError("Missing expected keys in LLM response")
-    except (json.JSONDecodeError, ValueError):
+    if not all(k in result for k in ("severity", "category", "reasoning")):
         result = {"severity": "unknown", "category": "unknown", "reasoning": "parse_failed"}
 
     return result

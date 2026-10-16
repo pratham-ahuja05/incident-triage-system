@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text
+from sqlalchemy import create_engine, Column, Integer, String, Text, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from pgvector.sqlalchemy import Vector
 import os
@@ -24,6 +24,12 @@ class PastIncident(Base):
     embedding = Column(Vector(384))                   # 384 dims — matches the embedding model we'll use
 
 
-if __name__ == "__main__":
+def init_db():
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(engine)
+
+
+if __name__ == "__main__":
+    init_db()
     print("Table created successfully.")

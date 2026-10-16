@@ -30,6 +30,11 @@ public class TriageResult {
     private String reasoning;
 
     private Double confidenceDistance;
+
+    // Stage timings reported by the AI service, in milliseconds (null = stage did not run / not recorded)
+    private Long retrievalMs;
+    private Long aiCheckMs;
+    private Long classifyMs;
     private Long matchedIncidentId;
 
     @Column(columnDefinition = "TEXT")

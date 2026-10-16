@@ -69,7 +69,7 @@ public DaoAuthenticationProvider authenticationProvider() {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> authz
-                        .requestMatchers("/auth/login", "/auth/register").permitAll()
+                        .requestMatchers("/auth/login", "/auth/register", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/alerts/stream").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/alerts/**").hasAnyRole("VIEWER", "ANALYST", "MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/alerts/*/retry").hasAnyRole("ANALYST", "MANAGER", "ADMIN")
@@ -78,6 +78,10 @@ public DaoAuthenticationProvider authenticationProvider() {
                         .requestMatchers(HttpMethod.POST, "/api/alerts").hasAnyRole("ANALYST", "MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/alerts/search").hasAnyRole("VIEWER", "ANALYST", "MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/alerts/*/mark-duplicate").hasAnyRole("ANALYST", "MANAGER", "ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/alerts/*").hasAnyRole("ANALYST", "MANAGER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/alerts/*/investigation").hasAnyRole("ANALYST", "MANAGER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/alerts/*/comments").hasAnyRole("VIEWER", "ANALYST", "MANAGER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/users").hasAnyRole("VIEWER", "ANALYST", "MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/triage-results/**").hasAnyRole("VIEWER", "ANALYST", "MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/triage-results/**").hasAnyRole("ANALYST", "MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/analytics").hasAnyRole("VIEWER", "ANALYST", "MANAGER", "ADMIN")
@@ -95,7 +99,7 @@ public DaoAuthenticationProvider authenticationProvider() {
         if (configuredOrigins.isEmpty()) configuredOrigins = List.of("http://localhost:5173");
 
         configuration.setAllowedOrigins(configuredOrigins);
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(false);

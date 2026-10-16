@@ -1,13 +1,13 @@
 import os
 import json
+import time
 import requests
 from dotenv import load_dotenv
-from groq import Groq
 from embeddings import generate_embedding
 from models import SessionLocal, PastIncident
+from llm import chat_json
 
 load_dotenv()
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 
 DISTANCE_THRESHOLD = 0.4
@@ -34,66 +34,69 @@ def get_top_match_with_distance(log_message: str):
         session.close()
 
 
+def _ms(start: float) -> int:
+    return int((time.perf_counter() - start) * 1000)
+
+
 def make_decision(alert_message: str) -> dict:
+    timings = {}
+    t = time.perf_counter()
     top_match, distance = get_top_match_with_distance(alert_message)
+    timings["retrieval"] = _ms(t)
 
     if top_match is None:
-        return escalate(alert_message, reason="No past incidents in database to compare against.")
-
-    if distance > DISTANCE_THRESHOLD:
-        return escalate(
+        result = escalate(alert_message, reason="No past incidents in database to compare against.")
+    elif distance > DISTANCE_THRESHOLD:
+        # No LLM call: the closest match is not similar enough to be worth verifying
+        result = escalate(
             alert_message,
             reason=f"Closest past incident was too dissimilar (distance={distance:.3f}, threshold={DISTANCE_THRESHOLD}).",
             candidate=top_match,
             distance=distance,
         )
-
-    llm_verdict = llm_confirm_match(alert_message, top_match)
-
-    if llm_verdict["is_match"]:
-        return auto_suggest_fix(alert_message, top_match, distance, llm_verdict["reasoning"])
     else:
-        return escalate(
-            alert_message,
-            reason=f"A close vector match was found, but the LLM determined it wasn't genuinely the same issue: {llm_verdict['reasoning']}",
-            candidate=top_match,
-            distance=distance,
-        )
+        t = time.perf_counter()
+        llm_verdict = llm_confirm_match(alert_message, top_match)
+        timings["ai_check"] = _ms(t)
+        if llm_verdict["is_match"]:
+            result = auto_suggest_fix(alert_message, top_match, distance, llm_verdict["reasoning"])
+        else:
+            result = escalate(
+                alert_message,
+                reason=f"A close vector match was found, but the LLM determined it wasn't genuinely the same issue: {llm_verdict['reasoning']}",
+                candidate=top_match,
+                distance=distance,
+            )
+
+    result["timings_ms"] = timings
+    return result
 
 
 def llm_confirm_match(alert_message: str, candidate: PastIncident) -> dict:
     prompt = f"""You are an SRE assistant. A new incident alert has come in, and a vector search
-found a potentially similar past incident. Determine if they are genuinely the same underlying issue.
+found a potentially similar past incident. Decide whether they are the same underlying problem,
+so the past fix would also work for the new alert.
+
+Ignore incidental details that differ between occurrences of the same problem: hostnames, IPs,
+ports, IDs, timestamps, counts, file paths and line numbers. Focus on the failing component and
+the failure mode.
 
 New alert: {alert_message}
 
 Candidate past incident: {candidate.log_message}
 Candidate resolution: {candidate.resolution}
 
-Respond with ONLY valid JSON, no other text:
-{{"is_match": true or false, "reasoning": "one sentence explanation"}}
+Respond with a JSON object: {{"is_match": true or false, "reasoning": "one sentence explanation"}}
 """
     try:
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            max_tokens=150,
-            messages=[{"role": "user", "content": prompt}],
-            timeout=10
-        )
+        result = chat_json(prompt)
     except Exception as e:
-        print(f"[LLM ERROR] API call failed: {e}")
-        return {"is_match": False, "reasoning": f"LLM API call failed ({type(e).__name__}), defaulting to escalation for safety."}
+        print(f"[LLM ERROR] match check failed: {type(e).__name__}: {e}")
+        return {"is_match": False, "reasoning": f"LLM check failed ({type(e).__name__}), defaulting to escalation for safety."}
 
-    raw = response.choices[0].message.content.strip()
-    if raw.startswith("```"):
-        raw = raw.strip("`").replace("json", "", 1).strip()
-    try:
-        result = json.loads(raw)
-        if "is_match" not in result or not isinstance(result["is_match"], bool):
-            raise ValueError("Missing or invalid 'is_match' field")
-        return result
-    except (json.JSONDecodeError, ValueError):
-        return {"is_match": False, "reasoning": "LLM verdict parsing failed, defaulting to escalation for safety."}
+    if not isinstance(result.get("is_match"), bool):
+        return {"is_match": False, "reasoning": "LLM verdict was malformed, defaulting to escalation for safety."}
+    return result
 
 
 def auto_suggest_fix(alert_message: str, matched_incident: PastIncident, distance: float, reasoning: str) -> dict:

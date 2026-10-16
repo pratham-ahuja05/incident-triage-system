@@ -5,6 +5,7 @@ import com.pratham.incident_triage_service.entity.TriageResult;
 import com.pratham.incident_triage_service.repository.AlertRepository;
 import com.pratham.incident_triage_service.repository.TriageResultRepository;
 import com.pratham.incident_triage_service.service.SseBroadcaster;
+import com.pratham.incident_triage_service.service.IncidentWorkflowService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -17,13 +18,13 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/triage-results")
-@CrossOrigin(origins = "http://localhost:5173")
 public class TriageResultController {
 
     @Autowired private TriageResultRepository triageResultRepository;
     @Autowired private AlertRepository alertRepository;
     @Autowired private WebClient webClient;
     @Autowired private SseBroadcaster broadcaster;
+    @Autowired private IncidentWorkflowService workflow;
 
     @Value("${python.service.url}")
     private String pythonServiceUrl;
@@ -39,6 +40,15 @@ public ResponseEntity<?> reviewDecision(@PathVariable Long id, @RequestParam Str
     TriageResult result = optionalResult.get();
     result.setHumanReviewStatus(decision);
     triageResultRepository.save(result);
+
+    String actor = IncidentWorkflowService.currentUser();
+    alertRepository.findById(result.getAlertId()).ifPresent(a -> {
+        workflow.log(a.getId(), "REVIEW", actor,
+                decision.equals("APPROVED") ? "Approved the suggested fix" : "Rejected the suggested fix");
+        // Approved fix = incident handled. Rejected = a person has to work it.
+        workflow.transition(a, decision.equals("APPROVED") ? "RESOLVED" : "IN_PROGRESS", actor);
+        alertRepository.save(a);
+    });
 
     // If approved, feed this proven fix back into the knowledge base
     if (decision.equals("APPROVED") && "auto_suggest_fix".equals(result.getDecision())) {
@@ -101,6 +111,11 @@ public ResponseEntity<?> reviewDecision(@PathVariable Long id, @RequestParam Str
             result.setHumanReviewStatus("RESOLVED");
             result.setHumanResolutionNote(resolutionNote);
             triageResultRepository.save(result);
+
+            String actor = IncidentWorkflowService.currentUser();
+            workflow.log(alert.getId(), "RESOLVED", actor, resolutionNote);
+            workflow.transition(alert, "RESOLVED", actor);
+            alertRepository.save(alert);
             broadcaster.broadcastUpdate();
 
             return ResponseEntity.ok(result);

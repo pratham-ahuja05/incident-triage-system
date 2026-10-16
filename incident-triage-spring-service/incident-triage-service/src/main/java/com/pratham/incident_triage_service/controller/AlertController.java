@@ -1,6 +1,10 @@
 package com.pratham.incident_triage_service.controller;
 
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Optional;
 import com.pratham.incident_triage_service.dto.AlertRequest;
@@ -10,6 +14,8 @@ import com.pratham.incident_triage_service.entity.Alert;
 import com.pratham.incident_triage_service.entity.TriageResult;
 import com.pratham.incident_triage_service.repository.AlertRepository;
 import com.pratham.incident_triage_service.repository.TriageResultRepository;
+import com.pratham.incident_triage_service.repository.IncidentEventRepository;
+import com.pratham.incident_triage_service.service.IncidentWorkflowService;
 import com.pratham.incident_triage_service.service.AlertQueueProducer;
 import com.pratham.incident_triage_service.service.SseBroadcaster;
 import com.pratham.incident_triage_service.config.RateLimitConfig;
@@ -24,7 +30,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import io.github.bucket4j.Bucket;
 
-@CrossOrigin(origins = "http://localhost:5173")
 @RestController
 @RequestMapping("/api/alerts")
 public class AlertController {
@@ -33,6 +38,8 @@ public class AlertController {
     @Autowired private AlertQueueProducer alertQueueProducer;
     @Autowired private TriageResultRepository triageResultRepository;
     @Autowired private SseBroadcaster broadcaster;
+    @Autowired private IncidentEventRepository eventRepository;
+    @Autowired private IncidentWorkflowService workflow;
 
     private final Bucket rateLimitBucket;
 
@@ -50,7 +57,9 @@ public class AlertController {
         Alert alert = new Alert();
         alert.setSource(request.getSource());
         alert.setMessage(request.getMessage());
+        alert.setReporter(IncidentWorkflowService.currentUser());
         Alert saved = alertRepository.save(alert);
+        workflow.log(saved.getId(), "CREATED", saved.getReporter(), "Reported from " + saved.getSource());
 
         alertQueueProducer.enqueue(saved.getId());
         broadcaster.broadcastUpdate();
@@ -70,29 +79,17 @@ public class AlertController {
         List<Alert> alerts = alertRepository.findAll().stream()
                 .filter(a -> !a.isDeleted())
                 .toList();
+        // Load triage results once and index by alert id (was one findAll() per alert).
+        Map<Long, TriageResult> resultsByAlert = triageResultRepository.findAll().stream()
+                .collect(Collectors.toMap(TriageResult::getAlertId, Function.identity(), (first, second) -> first));
+        Map<Long, Long> commentCounts = new HashMap<>();
+        for (Object[] row : eventRepository.countCommentsByAlert()) {
+            commentCounts.put((Long) row[0], (Long) row[1]);
+        }
         List<AlertWithResult> combined = new ArrayList<>();
-
         for (Alert alert : alerts) {
-            TriageResult result = triageResultRepository.findAll().stream()
-                    .filter(r -> r.getAlertId().equals(alert.getId()))
-                    .findFirst()
-                    .orElse(null);
-
-            combined.add(new AlertWithResult(
-                    alert.getId(), alert.getSource(), alert.getMessage(), alert.getStatus(),
-                    alert.getRetryCount(), alert.getCreatedAt(),
-                    result != null ? result.getId() : null,
-                    result != null ? result.getDecision() : null,
-                    result != null ? result.getSuggestedResolution() : null,
-                    result != null ? result.getReasoning() : null,
-                    result != null ? result.getConfidenceDistance() : null,
-                    result != null ? result.getHumanReviewStatus() : null,
-                    result != null ? result.getHumanResolutionNote() : null,
-                    result != null ? result.getMatchedIncidentId() : null,
-                    result != null ? result.getMatchedLog() : null,
-                    result != null ? result.getSeverity() : null,
-                    result != null ? result.getCategory() : null
-            ));
+            combined.add(AlertWithResult.of(alert, resultsByAlert.get(alert.getId()),
+                    commentCounts.getOrDefault(alert.getId(), 0L)));
         }
         return ResponseEntity.ok(combined);
     }
@@ -118,6 +115,7 @@ public class AlertController {
         alert.setRetryCount(0);
         alert.setStatus("PENDING");
         alertRepository.save(alert);
+        workflow.log(id, "RETRY", IncidentWorkflowService.currentUser(), "Triage re-queued");
         alertQueueProducer.enqueue(id);
         broadcaster.broadcastUpdate();
 
@@ -133,6 +131,7 @@ public class AlertController {
         Alert alert = optionalAlert.get();
         alert.setDeleted(true);
         alertRepository.save(alert);
+        workflow.log(id, "DELETED", IncidentWorkflowService.currentUser(), "Incident deleted");
         broadcaster.broadcastUpdate();
 
         return ResponseEntity.noContent().build();
@@ -158,17 +157,26 @@ public class AlertController {
         Optional<Alert> optionalAlert = alertRepository.findByIdWithDuplicates(id);
         if (optionalAlert.isEmpty()) return ResponseEntity.notFound().build();
 
-        Optional<Alert> optionalDup = alertRepository.findById(request.getDuplicateId());
+        if (request.getDuplicateId() == null || request.getDuplicateId().equals(id)) {
+            return ResponseEntity.badRequest().body("duplicateId must be another incident");
+        }
+        Optional<Alert> optionalDup = alertRepository.findByIdAndDeletedFalse(request.getDuplicateId());
         if (optionalDup.isEmpty()) return ResponseEntity.notFound().build();
 
+        // `id` is the duplicate; `duplicateId` is the original it duplicates.
+        // The processing status is left alone so the triage pipeline still reads correctly.
         Alert alert = optionalAlert.get();
-        alert.getDuplicates().add(optionalDup.get());
-        alert.setStatus("POSSIBLE_DUPLICATE");
-
-        Alert saved = alertRepository.save(alert);
+        Alert original = optionalDup.get();
+        String actor = IncidentWorkflowService.currentUser();
+        alert.getDuplicates().add(original);
+        alert.setDuplicateOfId(original.getId());
+        workflow.transition(alert, "CLOSED", actor);
+        workflow.log(id, "DUPLICATE", actor, "Closed as a duplicate of INC-" + original.getId());
+        workflow.log(original.getId(), "DUPLICATE", actor, "INC-" + id + " was closed as a duplicate of this incident");
+        alertRepository.save(alert);
         broadcaster.broadcastUpdate();
 
-        return ResponseEntity.ok(saved);
+        return ResponseEntity.ok(Map.of("id", id, "duplicateOfId", original.getId(), "ticketStatus", alert.getTicketStatus()));
     }
 
     @GetMapping("/stream")

@@ -18,6 +18,13 @@ public class SseBroadcaster {
         emitter.onCompletion(() -> emitters.remove(emitter));
         emitter.onTimeout(() -> emitters.remove(emitter));
         emitter.onError((e) -> emitters.remove(emitter));
+        // Send something immediately so the response is flushed and the browser's EventSource fires onopen;
+        // otherwise the stream looks "connecting" until the first alert update.
+        try {
+            emitter.send(SseEmitter.event().name("connected").data("ok"));
+        } catch (IOException e) {
+            emitters.remove(emitter);
+        }
         return emitter;
     }
 

@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { searchKnowledge } from "../api";
+import StatusTag from "./StatusTag";
+import { MATCH_HELP, humanize, matchQuality, severityTone } from "../lib/format";
 
-function KnowledgeBaseView() {
+function KnowledgeBaseView({ aiStatus }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -38,15 +40,25 @@ function KnowledgeBaseView() {
     <div className="kb">
       <div className="kb-intro">
         <p className="kb-sub">
-          Search resolved incidents semantically — the same retrieval the triage agent uses before it decides to auto-fix
-          or escalate.
+          Search resolved incidents semantically — the same retrieval the triage agent uses before it decides to
+          suggest a fix or escalate.
         </p>
       </div>
+
+      {aiStatus === "down" && (
+        <div className="stale-banner" role="status">
+          <span>
+            The AI service is offline, so search is unavailable. Start it with{" "}
+            <code>uvicorn main:app --reload --port 8000</code>.
+          </span>
+        </div>
+      )}
 
       <label className="field">
         <span className="sr-only">Search knowledge base</span>
         <input
           className="search kb-search"
+          type="search"
           placeholder="Try: database timeout, memory leak, auth token expired…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -64,20 +76,27 @@ function KnowledgeBaseView() {
 
       <div className="kb-results">
         {!loading &&
-          results.map((r) => (
-            <article key={r.id} className="kb-card">
-              <div className="kb-card-top">
-                <span className="tag tag-neutral">{r.category}</span>
-                <span className="tag tag-warning">{r.severity}</span>
-                <span className="kb-distance">distance {Number(r.distance).toFixed(3)}</span>
-              </div>
-              <p className="kb-log">{r.log_message}</p>
-              <div className="kb-resolution">
-                <span className="detail-label">Resolution</span>
-                <p className="detail-text">{r.resolution}</p>
-              </div>
-            </article>
-          ))}
+          results.map((r) => {
+            const quality = matchQuality(r.distance);
+            return (
+              <article key={r.id} className="kb-card">
+                <div className="kb-card-top">
+                  {r.category && <StatusTag label={humanize(r.category)} tone="neutral" />}
+                  {r.severity && <StatusTag label={humanize(r.severity)} tone={severityTone(r.severity)} />}
+                  {quality && (
+                    <span className="kb-distance" title={`${MATCH_HELP} (distance ${quality.distance.toFixed(3)})`}>
+                      <strong>{quality.similarity}%</strong> similar
+                    </span>
+                  )}
+                </div>
+                <p className="kb-log">{r.log_message}</p>
+                <div className="kb-resolution">
+                  <span className="detail-label">Resolution</span>
+                  <p className="detail-text">{r.resolution}</p>
+                </div>
+              </article>
+            );
+          })}
       </div>
     </div>
   );

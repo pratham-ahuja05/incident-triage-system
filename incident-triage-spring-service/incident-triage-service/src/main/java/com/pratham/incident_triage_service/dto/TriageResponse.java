@@ -2,6 +2,7 @@ package com.pratham.incident_triage_service.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
+import java.util.Map;
 
 @Data
 public class TriageResponse {
@@ -23,4 +24,7 @@ public class TriageResponse {
     private String reasoning;
     private String severity;
     private String category;
+
+    @JsonProperty("timings_ms")
+    private Map<String, Long> timingsMs;
 }
