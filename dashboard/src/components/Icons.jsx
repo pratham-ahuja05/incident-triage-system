@@ -164,6 +164,14 @@ export function IconReplay({ size }) {
   );
 }
 
+export function IconHome({ size }) {
+  return (
+    <Svg size={size}>
+      <path d="M2.5 7.5 8 3l5.5 4.5V13a.5.5 0 0 1-.5.5h-3.5v-4h-3v4H3a.5.5 0 0 1-.5-.5V7.5Z" {...stroke} />
+    </Svg>
+  );
+}
+
 export function IconKanban({ size }) {
   return (
     <Svg size={size}>

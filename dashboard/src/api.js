@@ -207,3 +207,9 @@ export async function markDuplicate(alertId, originalId) {
   if (!res.ok) throw new Error(await readError(res, "Could not mark as duplicate."));
   return res.json();
 }
+
+export async function fetchRecentActivity() {
+  const res = await apiFetch("/api/activity");
+  if (!res.ok) throw new Error(await readError(res, "Could not load recent activity."));
+  return res.json();
+}

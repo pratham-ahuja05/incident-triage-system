@@ -20,7 +20,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.ok(authService.register(request));
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+        try {
+            return ResponseEntity.ok(authService.register(request));
+        } catch (IllegalStateException e) {
+            // duplicate username/email: tell the user instead of failing with a 500
+            return ResponseEntity.status(409).body(java.util.Map.of("message", e.getMessage()));
+        }
     }
 }

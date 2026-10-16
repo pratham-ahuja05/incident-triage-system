@@ -1,0 +1,4 @@
+node_modules
+out
+# the uncompressed score (music.m4a is committed instead)
+public/music.wav

@@ -18,10 +18,14 @@ import { DEMO_INCIDENT, TOUR_STEPS, hasOnboarded, markOnboarded } from "./lib/on
 import "./App.css";
 
 // Secondary views load on demand to keep the first paint small.
+const OverviewView = lazy(() => import("./components/OverviewView"));
 const KanbanView = lazy(() => import("./components/KanbanView"));
 const CalendarView = lazy(() => import("./components/CalendarView"));
 const AnalyticsView = lazy(() => import("./components/AnalyticsView"));
 const KnowledgeBaseView = lazy(() => import("./components/KnowledgeBaseView"));
+
+// Views that open an incident in a side drawer instead of the list's detail pane
+const DRAWER_VIEWS = ["overview", "kanban", "calendar"];
 
 function isTypingTarget(el) {
   return Boolean(el?.closest?.("input, textarea, select, [contenteditable='true'], dialog"));
@@ -42,8 +46,8 @@ function Console({ session, onSignOut, theme, onToggleTheme }) {
   const openNav = () => setNavOpen(true);
   // Incidents open in place: the list's detail pane on the board, a side drawer everywhere else.
   const openIncident = useCallback(
-    (id) => navigate(["kanban", "calendar"].includes(route.view) ? route.view : "board", id),
-    [navigate, route.view]
+    (id) => navigate(DRAWER_VIEWS.includes(route.view) ? route.view : "board", id),
+    [navigate, route.view],
   );
   const selectOnBoard = useCallback((id) => navigate("board", id), [navigate]);
   const closeDrawer = useCallback(() => navigate(route.view), [navigate, route.view]);
@@ -100,6 +104,7 @@ function Console({ session, onSignOut, theme, onToggleTheme }) {
 
   const paletteActions = useMemo(
     () => [
+      { key: "go-overview", group: "Go to", label: "Overview", run: () => navigate("overview") },
       { key: "go-board", group: "Go to", label: "Triage queue", run: () => navigate("board") },
       { key: "go-kanban", group: "Go to", label: "Kanban board", run: () => navigate("kanban") },
       { key: "go-calendar", group: "Go to", label: "Calendar", run: () => navigate("calendar") },
@@ -109,12 +114,17 @@ function Console({ session, onSignOut, theme, onToggleTheme }) {
         ? [{ key: "new", group: "Create", label: "Report an incident", hint: "n", run: () => setReporting(true) }]
         : []),
       { key: "help", group: "Help", label: "How it works", run: () => setOnboarding("welcome") },
-      { key: "theme", group: "Settings", label: `Switch to ${theme === "light" ? "dark" : "light"} theme`, run: onToggleTheme },
+      {
+        key: "theme",
+        group: "Settings",
+        label: `Switch to ${theme === "light" ? "dark" : "light"} theme`,
+        run: onToggleTheme,
+      },
     ],
-    [navigate, writeAccess, theme, onToggleTheme]
+    [navigate, writeAccess, theme, onToggleTheme],
   );
 
-  const drawerOpen = ["kanban", "calendar"].includes(route.view) && route.id;
+  const drawerOpen = DRAWER_VIEWS.includes(route.view) && route.id;
   const drawerAlert = drawerOpen ? store.alerts.find((a) => a.id === route.id) || null : null;
   const detailProps = {
     onReview: store.review,
@@ -161,6 +171,29 @@ function Console({ session, onSignOut, theme, onToggleTheme }) {
       <main className="main">
         <ErrorBoundary key={route.view}>
           <Suspense fallback={<p className="empty-state">Loading…</p>}>
+            {route.view === "overview" && (
+              <>
+                <PageHeader
+                  title="Overview"
+                  subtitle="Command center — what needs attention, how triage is performing, and what just happened."
+                  onOpenNav={openNav}
+                  meta={
+                    <span className="live-badge">
+                      <span className={`live-dot ${store.live ? "" : "poll"}`} />
+                      {store.live ? "Live updates" : "Polling every 8s"}
+                    </span>
+                  }
+                  actions={
+                    writeAccess && (
+                      <button type="button" className="btn btn-primary" onClick={() => setReporting(true)}>
+                        Report issue
+                      </button>
+                    )
+                  }
+                />
+                <OverviewView store={store} me={me} onOpen={openIncident} onNavigate={navigate} />
+              </>
+            )}
             {route.view === "board" && (
               <BoardView
                 store={store}
@@ -233,7 +266,13 @@ function Console({ session, onSignOut, theme, onToggleTheme }) {
         />
       )}
       {onboarding === "welcome" && (
-        <Welcome session={session} canWrite={writeAccess} onTour={startTour} onDemo={startDemo} onClose={finishWelcome} />
+        <Welcome
+          session={session}
+          canWrite={writeAccess}
+          onTour={startTour}
+          onDemo={startDemo}
+          onClose={finishWelcome}
+        />
       )}
       {onboarding === "tour" && <Tour steps={TOUR_STEPS} onClose={() => setOnboarding(null)} />}
     </div>

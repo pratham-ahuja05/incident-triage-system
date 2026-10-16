@@ -2,12 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { AI_ORIGIN, API_ORIGIN, apiFetch } from "../api";
 
 // Location hash as the route: #/board, #/board/42, #/kanban/42, #/calendar, #/analytics, #/knowledge
-const VIEWS = ["board", "kanban", "calendar", "analytics", "knowledge"];
-const VIEWS_WITH_ISSUE = ["board", "kanban", "calendar"];
+const VIEWS = ["overview", "board", "kanban", "calendar", "analytics", "knowledge"];
+const VIEWS_WITH_ISSUE = ["overview", "board", "kanban", "calendar"];
 
 function parseHash() {
   const parts = window.location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  const view = VIEWS.includes(parts[0]) ? parts[0] : "board";
+  const view = VIEWS.includes(parts[0]) ? parts[0] : "overview";
   const id = VIEWS_WITH_ISSUE.includes(view) && parts[1] ? Number(parts[1]) || null : null;
   return { view, id };
 }

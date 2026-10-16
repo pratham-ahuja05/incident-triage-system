@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import PipelineStepper from "./PipelineStepper";
 import { IconPlay } from "./Icons";
-import { STAGES } from "../lib/pipeline";
+import { STAGES, useLoopingCount } from "../lib/pipeline";
 import { normalizeRole } from "../api";
 
 const DEMO_STAGES = STAGES.map((s, i) => ({
@@ -25,18 +25,6 @@ const STEPS = [
     body: "Approve a suggested fix, or record how an escalation was fixed. Every confirmed fix is learned, so the next one is automatic.",
   },
 ];
-
-// Loops the pipeline animation so a first-time user sees the whole flow.
-function useLoopingCount(max, ms) {
-  const [count, setCount] = useState(1);
-  useEffect(() => {
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) return undefined;
-    const timer = setInterval(() => setCount((c) => (c >= max + 2 ? 1 : c + 1)), ms);
-    return () => clearInterval(timer);
-  }, [max, ms]);
-  return Math.min(count, max);
-}
 
 function Welcome({ session, canWrite, onTour, onDemo, onClose }) {
   const dialogRef = useRef(null);

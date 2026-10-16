@@ -15,8 +15,29 @@
 
 ---
 
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Overview command center](docs/screenshots/overview.png) | ![Sign-in with live log stream](docs/screenshots/signin.png) |
+| **Overview** — what needs attention, SLA health, live activity, service heatmap | **Sign-in** — animated pipeline preview and a cursor-reactive log stream |
+| ![Incident with the triage pipeline](docs/screenshots/incident-pipeline.png) | ![AI investigation](docs/screenshots/investigation.png) |
+| **Triage pipeline** — every stage clickable, with recorded timings and AI vs observed vs human labels | **AI investigation** — hypotheses linked to real past incidents, risk-rated next steps |
+| ![Kanban board](docs/screenshots/kanban.png) | ![Calendar](docs/screenshots/calendar.png) |
+| **Kanban** — drag incidents through the workflow, priority-sorted | **Calendar** — reported and SLA due dates, overdue highlighted |
+
+<details>
+<summary>Light theme</summary>
+
+![Overview in light theme](docs/screenshots/overview-light.png)
+
+</details>
+
+A 75-second demo video is generated in code from `video/` (Remotion) — see [video/README.md](video/README.md).
+
 ## Table of Contents
 
+- [Screenshots](#screenshots)
 - [What This Project Does](#what-this-project-does)
 - [Project Status](#project-status)
 - [Architecture](#architecture)

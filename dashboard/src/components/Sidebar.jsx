@@ -5,6 +5,7 @@ import {
   IconChart,
   IconClose,
   IconHelp,
+  IconHome,
   IconKanban,
   IconMark,
   IconPlus,
@@ -13,6 +14,7 @@ import {
 import { normalizeRole } from "../api";
 
 const NAV_ITEMS = [
+  { key: "overview", label: "Overview", icon: IconHome },
   { key: "board", label: "Triage queue", icon: IconBoard },
   { key: "kanban", label: "Kanban board", icon: IconKanban },
   { key: "calendar", label: "Calendar", icon: IconCalendar },

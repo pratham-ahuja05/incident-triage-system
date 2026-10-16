@@ -3,3 +3,6 @@ venv/
 __pycache__/
 *.pyc
 .env
+# demo_seed.py local state
+demo_archived_ids.json
+demo_seeded_ids.json

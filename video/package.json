@@ -1,0 +1,18 @@
+{
+  "name": "incident-triage-video",
+  "private": true,
+  "description": "Code-generated promo video for Incident Triage (Remotion)",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render Ad out/incident-triage-ad.mp4",
+    "render:vertical": "remotion render AdVertical out/incident-triage-ad-vertical.mp4",
+    "still": "remotion still Ad out/frame.png --frame=420"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.532",
+    "@remotion/google-fonts": "4.0.532",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.532"
+  }
+}

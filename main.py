@@ -75,7 +75,8 @@ class SearchResult(BaseModel):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    # slack_configured lets tools (e.g. demo_seed.py) avoid spamming a real channel
+    return {"status": "ok", "slack_configured": bool(os.getenv("SLACK_WEBHOOK_URL"))}
 
 
 @app.post("/alerts/ingest", response_model=AlertAck)

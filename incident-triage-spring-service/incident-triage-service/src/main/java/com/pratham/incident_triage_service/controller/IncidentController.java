@@ -139,6 +139,30 @@ public class IncidentController {
         return ResponseEntity.ok(saved);
     }
 
+    // Latest events across all incidents, for the overview feed. Deleted incidents are skipped.
+    @GetMapping("/activity")
+    public List<Map<String, Object>> recentActivity() {
+        List<IncidentEvent> events = eventRepository.findRecentForActiveAlerts(org.springframework.data.domain.PageRequest.of(0, 40));
+        Map<Long, Alert> alerts = alertRepository.findAllById(events.stream().map(IncidentEvent::getAlertId).distinct().toList())
+                .stream().collect(Collectors.toMap(Alert::getId, a -> a));
+        return events.stream()
+                .filter(e -> alerts.containsKey(e.getAlertId()) && !alerts.get(e.getAlertId()).isDeleted())
+                .map(e -> {
+                    Alert a = alerts.get(e.getAlertId());
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", e.getId());
+                    m.put("alertId", e.getAlertId());
+                    m.put("type", e.getType());
+                    m.put("actor", e.getActor());
+                    m.put("message", e.getMessage());
+                    m.put("createdAt", e.getCreatedAt());
+                    m.put("source", a.getSource());
+                    m.put("alertMessage", a.getMessage());
+                    return m;
+                })
+                .toList();
+    }
+
     // People who can be assigned (no emails or other personal data).
     @GetMapping("/users")
     public List<Map<String, Object>> users() {

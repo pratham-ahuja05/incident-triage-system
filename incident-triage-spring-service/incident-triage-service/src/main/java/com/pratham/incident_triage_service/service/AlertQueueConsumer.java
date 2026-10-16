@@ -20,7 +20,9 @@ import java.util.Optional;
 @Service
 public class AlertQueueConsumer {
 
-    private static final String QUEUE_KEY = "alert_queue";
+    // Configurable so separate environments sharing one Redis do not steal each other's work
+    @Value("${app.queue-key:alert_queue}")
+    private String QUEUE_KEY;
     private static final int MAX_RETRIES = 3;
 
     @Autowired private RedisTemplate<String, String> redisTemplate;

@@ -82,6 +82,7 @@ public DaoAuthenticationProvider authenticationProvider() {
                         .requestMatchers(HttpMethod.POST, "/api/alerts/*/investigation").hasAnyRole("ANALYST", "MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/alerts/*/comments").hasAnyRole("VIEWER", "ANALYST", "MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/users").hasAnyRole("VIEWER", "ANALYST", "MANAGER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/activity").hasAnyRole("VIEWER", "ANALYST", "MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/triage-results/**").hasAnyRole("VIEWER", "ANALYST", "MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/triage-results/**").hasAnyRole("ANALYST", "MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/analytics").hasAnyRole("VIEWER", "ANALYST", "MANAGER", "ADMIN")

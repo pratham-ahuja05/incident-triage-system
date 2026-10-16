@@ -134,3 +134,15 @@ export function formatElapsed(ms) {
   const s = total % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
+
+// Loops a reveal 1..max (with a short pause) for demo animations.
+export function useLoopingCount(max, ms) {
+  const [count, setCount] = useState(1);
+  useEffect(() => {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) return undefined;
+    const timer = setInterval(() => setCount((c) => (c >= max + 2 ? 1 : c + 1)), ms);
+    return () => clearInterval(timer);
+  }, [max, ms]);
+  return Math.min(count, max);
+}

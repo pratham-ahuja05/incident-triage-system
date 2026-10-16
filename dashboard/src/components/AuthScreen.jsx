@@ -1,6 +1,55 @@
 import { useState } from "react";
-import { IconMark } from "./Icons";
+import { IconMark, IconSearch, IconSparkle, IconUserCheck, IconKanban } from "./Icons";
+import PipelineStepper from "./PipelineStepper";
+import LogWall from "./LogWall";
+import { STAGES, useLoopingCount } from "../lib/pipeline";
 import { DEMO_LOGIN, loginRequest, registerRequest } from "../api";
+
+// Illustrative only: shows how a typical alert moves through the pipeline. Labelled "Example" in the UI.
+const PREVIEW_STAGES = STAGES.map((s, i) => ({
+  ...s,
+  state: "done",
+  tone: i === 4 ? "success" : undefined,
+  note: ["Stored", "12 ms wait", "85% match", "Confirmed", "Fix suggested", "Awaiting review"][i],
+}));
+
+const FEATURES = [
+  {
+    icon: IconSearch,
+    title: "Retrieval over past fixes",
+    body: "pgvector search finds the closest incident your team already solved.",
+  },
+  {
+    icon: IconSparkle,
+    title: "Explainable AI",
+    body: "An LLM verifies the match and writes evidence-linked hypotheses.",
+  },
+  {
+    icon: IconUserCheck,
+    title: "Humans decide",
+    body: "Suggestions are never applied automatically — people approve.",
+  },
+  {
+    icon: IconKanban,
+    title: "Workflow & SLAs",
+    body: "Priorities, due dates, Kanban, calendar and a full audit trail.",
+  },
+];
+
+function AuthPreview() {
+  const visible = useLoopingCount(PREVIEW_STAGES.length, 900);
+  return (
+    <div className="auth-preview" aria-hidden="true">
+      <div className="auth-preview-head">
+        <span className="dup-key">INC-1042</span>
+        <span className="auth-preview-src">checkout-service</span>
+        <span className="auth-preview-tag">Example</span>
+      </div>
+      <p className="auth-preview-msg">Error: Unable to connect to Redis at cache-01:6379, connection refused</p>
+      <PipelineStepper stages={PREVIEW_STAGES} visible={visible} />
+    </div>
+  );
+}
 
 // Seeded by DataInitializationConfig.java — local demo only.
 const DEMO_ACCOUNTS = [
@@ -50,22 +99,50 @@ function AuthScreen({ onAuthenticated }) {
   return (
     <div className="auth-shell">
       <section className="auth-panel">
-        <div className="brand-mark" aria-hidden="true">
-          <IconMark />
+        <div className="auth-hero">
+          <div className="auth-brand">
+            <span className="brand-mark" aria-hidden="true">
+              <IconMark />
+            </span>
+            <span className="brand-copy">
+              <span className="brand-name">Incident Triage</span>
+              <span className="brand-sub">AI-assisted incident response</span>
+            </span>
+          </div>
+
+          <h1 className="auth-headline">
+            Triage production alerts <span className="auth-accent">before they become pages.</span>
+          </h1>
+          <p className="auth-copy">
+            Every alert is matched against incidents your team already solved. Known problems get the proven fix
+            suggested in seconds; new ones go straight to an engineer — with the evidence attached.
+          </p>
+
+          <AuthPreview />
+
+          <ul className="auth-features">
+            {FEATURES.map((f) => {
+              const Icon = f.icon;
+              return (
+                <li key={f.title}>
+                  <span className="auth-feature-icon" aria-hidden="true">
+                    <Icon size={15} />
+                  </span>
+                  <span>
+                    <strong>{f.title}</strong>
+                    <span>{f.body}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+
+          <p className="auth-stack">React · Spring Boot · PostgreSQL + pgvector · Redis · Groq LLM · Docker</p>
         </div>
-        <p className="auth-kicker">Incident Triage</p>
-        <h1 className="auth-headline">Triage production alerts before they become pages.</h1>
-        <p className="auth-copy">
-          Match incoming logs against resolved incidents, auto-suggest proven fixes, and escalate only when the case is new.
-        </p>
-        <ul className="auth-points">
-          <li>RAG search over the incident knowledge base</li>
-          <li>AI suggests a proven fix or escalates — people approve</li>
-          <li>Human review feeds confirmed resolutions back in</li>
-        </ul>
       </section>
 
       <div className="auth-card-wrap">
+        <LogWall />
         <form className="auth-card" onSubmit={handleSubmit}>
           <div>
             <h2 className="modal-title">{isRegister ? "Create an account" : "Sign in"}</h2>
@@ -104,7 +181,12 @@ function AuthScreen({ onAuthenticated }) {
           <label className="field">
             <span className="field-label-row">
               Password
-              <button type="button" className="link-btn" onClick={() => setShowPassword((v) => !v)} aria-pressed={showPassword}>
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-pressed={showPassword}
+              >
                 {showPassword ? "Hide" : "Show"}
               </button>
             </span>
@@ -118,7 +200,11 @@ function AuthScreen({ onAuthenticated }) {
             />
           </label>
 
-          {error && <p className="form-error" role="alert">{error}</p>}
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
 
           <button type="submit" className="btn btn-primary" disabled={submitting}>
             {submitting ? "Please wait…" : isRegister ? "Create account" : "Sign in"}
@@ -154,6 +240,7 @@ function AuthScreen({ onAuthenticated }) {
             </div>
           )}
         </form>
+        <p className="auth-footnote">JWT sessions · role-based access for Admin, Analyst and Viewer</p>
       </div>
     </div>
   );
