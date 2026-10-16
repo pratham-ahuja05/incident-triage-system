@@ -1,13 +1,25 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
 import IssueList from "./components/IssueList";
 import IssueDetail from "./components/IssueDetail";
 import NewIssueModal from "./components/NewIssueModal";
 import AnalyticsView from "./components/AnalyticsView";
 import KnowledgeBaseView from "./components/KnowledgeBaseView";
+import AuthScreen from "./components/AuthScreen";
+import { IconMenu } from "./components/Icons";
+import {
+  API_ORIGIN,
+  canWrite,
+  clearSession,
+  fetchAlerts as fetchAlertsApi,
+  loadSession,
+  resolveIncident,
+  retryAlert,
+  reviewDecision,
+  saveSession,
+  submitAlert,
+} from "./api";
 import "./App.css";
-
-const BASE = "http://localhost:8080/api";
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -17,7 +29,7 @@ const FILTERS = [
   { key: "FAILED", label: "Failed" },
 ];
 
-function BoardView() {
+function BoardView({ writeAccess, onOpenNav }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -25,70 +37,66 @@ function BoardView() {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [live, setLive] = useState(false);
+  const [actionError, setActionError] = useState(null);
   const sseRef = useRef(null);
 
-  const fetchAlerts = () => {
-    fetch(`${BASE}/alerts`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Server responded ${res.status}`);
-        return res.json();
-      })
+  const refreshAlerts = useCallback(() => {
+    return fetchAlertsApi()
       .then((data) => {
-        setAlerts(data.reverse());
-        setLoading(false);
+        setAlerts(data);
         setError(null);
       })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  };
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
-    fetchAlerts();
-    // Real-time updates via SSE, with polling as a safety net
+    refreshAlerts();
     try {
-      const es = new EventSource(`${BASE}/alerts/stream`);
-      es.addEventListener("update", fetchAlerts);
-      es.onerror = () => es.close();
+      const es = new EventSource(`${API_ORIGIN}/api/alerts/stream`);
+      es.addEventListener("update", refreshAlerts);
+      es.onopen = () => setLive(true);
+      es.onerror = () => {
+        setLive(false);
+        es.close();
+      };
       sseRef.current = es;
     } catch {
-      // SSE unsupported/unavailable — polling below still covers it
+      // EventSource unavailable — 8s polling still covers updates.
     }
-    const interval = setInterval(fetchAlerts, 8000);
+    const interval = setInterval(refreshAlerts, 8000);
     return () => {
       clearInterval(interval);
       sseRef.current?.close();
     };
-  }, []);
+  }, [refreshAlerts]);
 
   const handleReview = (triageResultId, decision) => {
-    fetch(`${BASE}/triage-results/${triageResultId}/review?decision=${decision}`, { method: "POST" }).then(fetchAlerts);
+    setActionError(null);
+    reviewDecision(triageResultId, decision)
+      .then(refreshAlerts)
+      .catch((err) => setActionError(err.message));
   };
 
   const handleResolve = (triageResultId, resolutionNote) => {
-    return fetch(`${BASE}/triage-results/${triageResultId}/resolve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resolutionNote }),
-    }).then(fetchAlerts);
+    setActionError(null);
+    return resolveIncident(triageResultId, resolutionNote)
+      .then(refreshAlerts)
+      .catch((err) => {
+        setActionError(err.message);
+        throw err;
+      });
   };
 
   const handleRetry = (alertId) => {
-    fetch(`${BASE}/alerts/${alertId}/retry`, { method: "POST" }).then(fetchAlerts);
+    setActionError(null);
+    retryAlert(alertId)
+      .then(refreshAlerts)
+      .catch((err) => setActionError(err.message));
   };
 
-  const handleSubmitIssue = ({ source, message }) => {
-    return fetch(`${BASE}/alerts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source, message }),
-    }).then((res) => {
-      if (res.status === 429) throw new Error("Rate limit exceeded — slow down a little.");
-      setShowModal(false);
-      fetchAlerts();
-    });
-  };
+  const handleSubmitIssue = ({ source, message }) => submitAlert({ source, message }).then(refreshAlerts);
 
   const stats = useMemo(() => {
     const total = alerts.length;
@@ -101,10 +109,23 @@ function BoardView() {
     return { total, fixed, escalated, avgConfidence };
   }, [alerts]);
 
+  const counts = useMemo(
+    () => ({
+      all: alerts.length,
+      auto_suggest_fix: alerts.filter((a) => a.decision === "auto_suggest_fix").length,
+      escalate: alerts.filter((a) => a.decision === "escalate").length,
+      pending: alerts.filter((a) => !a.decision && a.status !== "FAILED").length,
+      FAILED: alerts.filter((a) => a.status === "FAILED").length,
+    }),
+    [alerts]
+  );
+
   const filtered = useMemo(() => {
     return alerts.filter((a) => {
       const matchesQuery =
-        !query || a.message.toLowerCase().includes(query.toLowerCase()) || a.source.toLowerCase().includes(query.toLowerCase());
+        !query ||
+        a.message.toLowerCase().includes(query.toLowerCase()) ||
+        a.source.toLowerCase().includes(query.toLowerCase());
       if (!matchesQuery) return false;
       if (filter === "all") return true;
       if (filter === "pending") return !a.decision && a.status !== "FAILED";
@@ -118,11 +139,31 @@ function BoardView() {
   return (
     <>
       <header className="topbar">
-        <h1 className="view-title">Board</h1>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          Report issue
-        </button>
+        <div className="topbar-left">
+          <button type="button" className="menu-toggle" onClick={onOpenNav} aria-label="Open navigation">
+            <IconMenu />
+          </button>
+          <div>
+            <h1 className="view-title">Board</h1>
+            <p className="view-sub">Live triage queue for ingested alerts.</p>
+            <span className="live-badge">
+              <span className={`live-dot ${live ? "" : "poll"}`} />
+              {live ? "Live updates" : "Polling every 8s"}
+            </span>
+          </div>
+        </div>
+        {writeAccess && (
+          <button type="button" className="btn btn-primary" onClick={() => setShowModal(true)}>
+            Report issue
+          </button>
+        )}
       </header>
+
+      {!writeAccess && (
+        <p className="role-note">
+          You are signed in as a Viewer. Reporting, retry, approval, and resolution require Analyst, Manager, or Admin.
+        </p>
+      )}
 
       <section className="stats">
         <div className="stat">
@@ -144,15 +185,24 @@ function BoardView() {
       </section>
 
       <section className="toolbar">
-        <input className="search" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <div className="filters">
+        <input
+          className="search"
+          placeholder="Search source or message…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search issues"
+        />
+        <div className="filters" role="tablist" aria-label="Issue filters">
           {FILTERS.map((f) => (
             <button
               key={f.key}
+              type="button"
               className={`filter-chip ${filter === f.key ? "filter-chip-active" : ""}`}
               onClick={() => setFilter(f.key)}
+              aria-selected={filter === f.key}
             >
               {f.label}
+              <span className="filter-count">{counts[f.key]}</span>
             </button>
           ))}
         </div>
@@ -160,13 +210,37 @@ function BoardView() {
 
       <section className="board">
         <div className="board-left">
-          {loading && <p className="empty-state">Loading…</p>}
+          {loading && (
+            <>
+              <div className="skeleton skeleton-row" />
+              <div className="skeleton skeleton-row" />
+              <div className="skeleton skeleton-row" />
+            </>
+          )}
           {error && <p className="empty-state empty-error">{error}</p>}
-          {!loading && !error && filtered.length === 0 && <p className="empty-state">No issues match this view.</p>}
-          {!loading && !error && <IssueList alerts={filtered} selectedId={selectedId} onSelect={setSelectedId} onRetry={handleRetry} />}
+          {!loading && !error && filtered.length === 0 && (
+            <p className="empty-state">No issues match this view.</p>
+          )}
+          {!loading && !error && (
+            <IssueList
+              alerts={filtered}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onRetry={handleRetry}
+              canRetry={writeAccess}
+            />
+          )}
         </div>
-        <div className="board-right">
-          <IssueDetail alert={selected} onReview={handleReview} onResolve={handleResolve} />
+        <div className={`board-right ${selected ? "open" : ""}`}>
+          <IssueDetail
+            key={selected ? selected.id : "empty"}
+            alert={selected}
+            onReview={handleReview}
+            onResolve={handleResolve}
+            onBack={() => setSelectedId(null)}
+            canWrite={writeAccess}
+            actionError={actionError}
+          />
         </div>
       </section>
 
@@ -177,16 +251,60 @@ function BoardView() {
 
 function App() {
   const [view, setView] = useState("board");
+  const [session, setSession] = useState(() => loadSession());
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    const onUnauthorized = () => setSession(null);
+    window.addEventListener("triage:unauthorized", onUnauthorized);
+    return () => window.removeEventListener("triage:unauthorized", onUnauthorized);
+  }, []);
+
+  const authenticate = (payload) => {
+    saveSession(payload);
+    setSession(payload);
+  };
+
+  const signOut = () => {
+    clearSession();
+    setSession(null);
+  };
+
+  const navigate = (next) => {
+    setView(next);
+    setNavOpen(false);
+  };
+
+  if (!session?.token) {
+    return <AuthScreen onAuthenticated={authenticate} />;
+  }
+
+  const writeAccess = canWrite(session);
 
   return (
     <div className="app-shell">
-      <Sidebar active={view} onNavigate={setView} />
+      <Sidebar
+        active={view}
+        onNavigate={navigate}
+        session={session}
+        onSignOut={signOut}
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
+      />
       <main className="main">
-        {view === "board" && <BoardView />}
+        {view === "board" && <BoardView writeAccess={writeAccess} onOpenNav={() => setNavOpen(true)} />}
         {view === "analytics" && (
           <>
             <header className="topbar">
-              <h1 className="view-title">Analytics</h1>
+              <div className="topbar-left">
+                <button type="button" className="menu-toggle" onClick={() => setNavOpen(true)} aria-label="Open navigation">
+                  <IconMenu />
+                </button>
+                <div>
+                  <h1 className="view-title">Analytics</h1>
+                  <p className="view-sub">Pipeline volume, outcomes, and review health.</p>
+                </div>
+              </div>
             </header>
             <AnalyticsView />
           </>
@@ -194,7 +312,15 @@ function App() {
         {view === "knowledge" && (
           <>
             <header className="topbar">
-              <h1 className="view-title">Knowledge Base</h1>
+              <div className="topbar-left">
+                <button type="button" className="menu-toggle" onClick={() => setNavOpen(true)} aria-label="Open navigation">
+                  <IconMenu />
+                </button>
+                <div>
+                  <h1 className="view-title">Knowledge Base</h1>
+                  <p className="view-sub">Semantic search over past resolved incidents.</p>
+                </div>
+              </div>
             </header>
             <KnowledgeBaseView />
           </>

@@ -1,26 +1,54 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function NewIssueModal({ onClose, onSubmit }) {
   const [source, setSource] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!source.trim() || !message.trim()) return;
     setSubmitting(true);
-    onSubmit({ source, message }).finally(() => setSubmitting(false));
+    setError("");
+    onSubmit({ source, message })
+      .then(() => onClose())
+      .catch((err) => setError(err.message || "Submit failed."))
+      .finally(() => setSubmitting(false));
   };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
-        <h2 className="modal-title">Report an incident</h2>
+      <form
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-issue-title"
+      >
+        <h2 id="new-issue-title" className="modal-title">
+          Report an incident
+        </h2>
         <p className="modal-sub">This goes through the same pipeline as a real monitoring alert.</p>
 
         <label className="field">
           <span>Source</span>
-          <input value={source} onChange={(e) => setSource(e.target.value)} placeholder="payment-service" autoFocus />
+          <input
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+            placeholder="payment-service"
+            autoFocus
+            required
+          />
         </label>
 
         <label className="field">
@@ -30,8 +58,11 @@ function NewIssueModal({ onClose, onSubmit }) {
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Paste the raw error or log line here…"
             rows={4}
+            required
           />
         </label>
+
+        {error && <p className="form-error" role="alert">{error}</p>}
 
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>

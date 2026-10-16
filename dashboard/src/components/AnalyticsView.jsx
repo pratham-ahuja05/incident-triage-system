@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-
-const BASE = "http://localhost:8080/api";
+import { fetchAnalytics } from "../api";
 
 function Bar({ label, value, max, tone }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
     <div className="bar-row">
-      <span className="bar-label">{label}</span>
-      <div className="bar-track">
+      <span className="bar-label" title={label}>
+        {label}
+      </span>
+      <div className="bar-track" aria-hidden="true">
         <div className={`bar-fill bar-${tone}`} style={{ width: `${pct}%` }} />
       </div>
       <span className="bar-value">{value}</span>
@@ -17,21 +18,42 @@ function Bar({ label, value, max, tone }) {
 
 function AnalyticsView() {
   const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
 
-  const fetchData = () => {
-    fetch(`${BASE}/analytics`)
-      .then((res) => res.json())
-      .then(setData)
-      .catch(() => {});
+  const load = () => {
+    fetchAnalytics()
+      .then((payload) => {
+        setData(payload);
+        setError(null);
+      })
+      .catch((err) => setError(err.message));
   };
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
+    load();
+    const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  if (!data) return <p className="empty-state">Loading analytics…</p>;
+  if (error && !data) {
+    return <p className="empty-state empty-error">{error}</p>;
+  }
+
+  if (!data) {
+    return (
+      <div>
+        <div className="stats">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="stat">
+              <div className="skeleton skeleton-stat-value" />
+              <div className="skeleton skeleton-stat-label" />
+            </div>
+          ))}
+        </div>
+        <p className="empty-state">Loading analytics…</p>
+      </div>
+    );
+  }
 
   const categoryEntries = Object.entries(data.byCategory || {});
   const severityEntries = Object.entries(data.bySeverity || {});
@@ -39,12 +61,13 @@ function AnalyticsView() {
   const maxCategory = Math.max(1, ...categoryEntries.map(([, v]) => v));
   const maxSeverity = Math.max(1, ...severityEntries.map(([, v]) => v));
   const maxReview = Math.max(1, ...reviewEntries.map(([, v]) => v));
-
   const autoFixRate = data.totalAlerts > 0 ? ((data.autoFixed / data.totalAlerts) * 100).toFixed(1) : "0.0";
 
   return (
     <div className="analytics">
-      <div className="stats stats-wide">
+      {error && <p className="form-error form-error-spaced" role="alert">{error}</p>}
+
+      <div className="stats">
         <div className="stat">
           <span className="stat-value">{data.totalAlerts}</span>
           <span className="stat-label">Total issues</span>
@@ -66,7 +89,7 @@ function AnalyticsView() {
       <div className="panel-grid">
         <div className="panel">
           <h3 className="panel-title">By category</h3>
-          {categoryEntries.length === 0 && <p className="empty-state">No data yet.</p>}
+          {categoryEntries.length === 0 && <p className="empty-state">No classified incidents yet.</p>}
           {categoryEntries.map(([label, value]) => (
             <Bar key={label} label={label} value={value} max={maxCategory} tone="accent" />
           ))}
@@ -74,7 +97,7 @@ function AnalyticsView() {
 
         <div className="panel">
           <h3 className="panel-title">By severity</h3>
-          {severityEntries.length === 0 && <p className="empty-state">No data yet.</p>}
+          {severityEntries.length === 0 && <p className="empty-state">No severity data yet.</p>}
           {severityEntries.map(([label, value]) => (
             <Bar key={label} label={label} value={value} max={maxSeverity} tone="warning" />
           ))}
@@ -82,11 +105,11 @@ function AnalyticsView() {
 
         <div className="panel">
           <h3 className="panel-title">Human review outcomes</h3>
-          {reviewEntries.length === 0 && <p className="empty-state">No data yet.</p>}
+          {reviewEntries.length === 0 && <p className="empty-state">No reviews recorded yet.</p>}
           {reviewEntries.map(([label, value]) => (
             <Bar
               key={label}
-              label={label.replace("_", " ").toLowerCase()}
+              label={String(label).replace("_", " ").toLowerCase()}
               value={value}
               max={maxReview}
               tone={label === "REJECTED" ? "danger" : label === "APPROVED" || label === "RESOLVED" ? "success" : "accent"}

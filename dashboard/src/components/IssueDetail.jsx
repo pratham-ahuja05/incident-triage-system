@@ -1,13 +1,16 @@
 import { useState } from "react";
+import { IconBack } from "./Icons";
 
-function IssueDetail({ alert, onReview, onResolve }) {
+function IssueDetail({ alert, onReview, onResolve, onBack, canWrite, actionError }) {
   const [note, setNote] = useState("");
   const [showResolveForm, setShowResolveForm] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   if (!alert) {
     return (
       <div className="detail-empty">
-        <p>Select an issue on the left to see its full triage process.</p>
+        <p className="detail-empty-title">No issue selected</p>
+        <p>Choose an incident from the board to inspect retrieval, reasoning, and the decision trail.</p>
       </div>
     );
   }
@@ -20,20 +23,30 @@ function IssueDetail({ alert, onReview, onResolve }) {
 
   const submitResolve = () => {
     if (!note.trim()) return;
-    onResolve(alert.triageResultId, note).then(() => {
-      setNote("");
-      setShowResolveForm(false);
-    });
+    setBusy(true);
+    Promise.resolve(onResolve(alert.triageResultId, note))
+      .then(() => {
+        setNote("");
+        setShowResolveForm(false);
+      })
+      .finally(() => setBusy(false));
   };
 
   return (
     <div className="detail">
+      {onBack && (
+        <button type="button" className="detail-back btn" onClick={onBack}>
+          <IconBack />
+          Back to list
+        </button>
+      )}
+
       <div className="detail-top">
         <span className="detail-key">INC-{alert.id}</span>
         <h2 className="detail-title">{alert.message}</h2>
         <span className="detail-source">
           reported by {alert.source}
-          {alert.retryCount > 0 && <span className="detail-retry"> · retried {alert.retryCount}x</span>}
+          {alert.retryCount > 0 && <span className="detail-retry"> · retried {alert.retryCount}×</span>}
         </span>
       </div>
 
@@ -113,7 +126,9 @@ function IssueDetail({ alert, onReview, onResolve }) {
             {alert.status === "FAILED" && (
               <div className="decision-card decision-danger">
                 <span className="decision-heading">Processing failed — dead-lettered</span>
-                <p className="tl-text">Retried {alert.retryCount} times, then gave up. Retry manually below.</p>
+                <p className="tl-text">
+                  Retried {alert.retryCount} times, then gave up. Retry from the board if you have Analyst access.
+                </p>
               </div>
             )}
           </div>
@@ -127,15 +142,18 @@ function IssueDetail({ alert, onReview, onResolve }) {
               <p className="tl-text">
                 Status: <strong>{alert.humanReviewStatus?.replace("_", " ").toLowerCase()}</strong>
               </p>
-              {alert.humanReviewStatus === "PENDING_REVIEW" && (
+              {alert.humanReviewStatus === "PENDING_REVIEW" && canWrite && (
                 <div className="detail-actions">
-                  <button className="btn btn-approve" onClick={() => onReview(alert.triageResultId, "APPROVED")}>
+                  <button type="button" className="btn btn-approve" onClick={() => onReview(alert.triageResultId, "APPROVED")}>
                     Approve fix
                   </button>
-                  <button className="btn btn-reject" onClick={() => onReview(alert.triageResultId, "REJECTED")}>
+                  <button type="button" className="btn btn-reject" onClick={() => onReview(alert.triageResultId, "REJECTED")}>
                     Reject
                   </button>
                 </div>
+              )}
+              {alert.humanReviewStatus === "PENDING_REVIEW" && !canWrite && (
+                <p className="tl-text tl-muted">Waiting on an Analyst or Manager to review this suggestion.</p>
               )}
               {alert.humanReviewStatus === "APPROVED" && (
                 <p className="tl-text tl-muted">This fix was added back into the knowledge base.</p>
@@ -157,37 +175,47 @@ function IssueDetail({ alert, onReview, onResolve }) {
                     <p className="candidate-log">{alert.humanResolutionNote}</p>
                   </div>
                 </>
-              ) : canResolve ? (
+              ) : canResolve && canWrite ? (
                 showResolveForm ? (
                   <div className="resolve-form">
-                    <textarea
-                      className="resolve-textarea"
-                      placeholder="How was this actually fixed? This teaches the system for next time."
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      rows={3}
-                    />
+                    <label className="field">
+                      <span>How was this actually fixed?</span>
+                      <textarea
+                        className="resolve-textarea"
+                        placeholder="This teaches the system for next time."
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        rows={3}
+                      />
+                    </label>
                     <div className="detail-actions">
-                      <button className="btn" onClick={() => setShowResolveForm(false)}>
+                      <button type="button" className="btn" onClick={() => setShowResolveForm(false)}>
                         Cancel
                       </button>
-                      <button className="btn btn-primary" onClick={submitResolve}>
-                        Save & teach system
+                      <button type="button" className="btn btn-primary" onClick={submitResolve} disabled={busy || !note.trim()}>
+                        {busy ? "Saving…" : "Save & teach system"}
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <button className="btn btn-primary" onClick={() => setShowResolveForm(true)}>
+                  <button type="button" className="btn btn-primary" onClick={() => setShowResolveForm(true)}>
                     Mark as resolved
                   </button>
                 )
               ) : (
-                <p className="tl-text tl-muted">Not yet resolved.</p>
+                <p className="tl-text tl-muted">
+                  {canWrite ? "Not yet resolved." : "Waiting on an Analyst or Manager to record a resolution."}
+                </p>
               )}
             </div>
           </div>
         )}
       </div>
+      {actionError && (
+        <p className="form-error detail-error" role="alert">
+          {actionError}
+        </p>
+      )}
     </div>
   );
 }
