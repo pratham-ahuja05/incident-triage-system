@@ -1,0 +1,220 @@
+# CI/CD: check every push to main, then deploy it to the Azure VM over SSH.
+# One-time setup (SSH key, secrets, VM prep) and rollback steps: docs/DEPLOYMENT.md
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      allow_config_change:
+        description: >-
+          Services whose Compose configuration is expected to change in this deploy
+          (comma-separated, e.g. "api,web"). Leave empty for normal deploys.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+# One deployment at a time. A newer push waits for the running one instead of
+# cancelling it halfway through a rebuild.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  APP_URL: https://incidentsense.duckdns.org
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Throwaway databases for the Spring context test. Unrelated to production.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: triage_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d triage_db"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint workflow and deploy script
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash) 1.7.12
+          ./actionlint -color
+          shellcheck scripts/deploy.sh
+
+      - name: Validate Compose files
+        # Dummy values only satisfy the required-variable checks; nothing is started.
+        # The example override mirrors the VM-only one, so base-file changes that would
+        # break production are caught here.
+        env:
+          POSTGRES_PASSWORD: ci
+          GROQ_API_KEY: ci
+          JWT_SECRET: ci
+        run: |
+          docker compose -f docker-compose.yml config --quiet
+          prod=(docker compose -f docker-compose.yml -f deploy/docker-compose.override.example.yml)
+          "${prod[@]}" config --quiet
+          for svc in postgres redis ai api web caddy; do
+            "${prod[@]}" config --services | grep -qx "$svc" || { echo "::error::Service '$svc' missing from base + override"; exit 1; }
+          done
+          if "${prod[@]}" config --format json | jq -e '.services.web.ports // [] | length > 0' > /dev/null; then
+            echo "::error::web must not publish host ports in production (Caddy owns 80/443)"
+            exit 1
+          fi
+
+      - name: Python syntax check
+        run: python3 -m py_compile ./*.py
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: incident-triage-spring-service/incident-triage-service/pom.xml
+
+      - name: API tests and build
+        working-directory: incident-triage-spring-service/incident-triage-service
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/triage_db
+          DB_PASSWORD: ci-only-password
+          SEED_DEMO_USERS: "false"
+        run: |
+          JWT_SECRET=$(openssl rand -base64 64 | tr -d '\n')
+          export JWT_SECRET
+          bash ./mvnw -B -ntp verify
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Dashboard lint and build
+        working-directory: dashboard
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+
+  deploy:
+    name: Deploy to Azure VM
+    needs: checks
+    # workflow_dispatch can be started from any branch; only main is ever deployed.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    # The first build of the AI image (CPU torch + embedding model) is slow on a small VM.
+    timeout-minutes: 45
+    environment:
+      name: production
+      url: ${{ env.APP_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Configure SSH
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          VM_SSH_PORT: ${{ secrets.VM_SSH_PORT }}
+          VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+          VM_KNOWN_HOSTS: ${{ secrets.VM_KNOWN_HOSTS }}
+          VM_APP_DIR: ${{ secrets.VM_APP_DIR }}
+        run: |
+          missing=()
+          for name in VM_HOST VM_USER VM_SSH_KEY VM_KNOWN_HOSTS VM_APP_DIR; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing repository secrets: ${missing[*]} (see docs/DEPLOYMENT.md)"
+            exit 1
+          fi
+
+          install -d -m 700 ~/.ssh
+          (umask 077 && printf '%s\n' "$VM_SSH_KEY" > ~/.ssh/deploy_key)
+          printf '%s\n' "$VM_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          if ! ssh-keygen -y -P '' -f ~/.ssh/deploy_key > /dev/null 2>&1; then
+            echo "::error::VM_SSH_KEY is not a valid unencrypted private key (copy the whole file, including the BEGIN/END lines)"
+            exit 1
+          fi
+
+          # Host keys are pinned by VM_KNOWN_HOSTS; an unknown or changed host key aborts the deploy.
+          cat > ~/.ssh/config <<EOF
+          Host vm
+            HostName $VM_HOST
+            User $VM_USER
+            Port ${VM_SSH_PORT:-22}
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            UserKnownHostsFile ~/.ssh/known_hosts
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ConnectTimeout 20
+            ServerAliveInterval 30
+            ServerAliveCountMax 10
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Check SSH connection
+        run: |
+          if ! ssh vm true; then
+            echo "::error::Could not SSH into the VM. Check VM_HOST/VM_USER/VM_SSH_PORT, that the public key is in authorized_keys, that VM_KNOWN_HOSTS matches the host, and that the Azure NSG allows SSH from GitHub runners"
+            exit 1
+          fi
+
+      - name: Deploy on VM
+        env:
+          VM_APP_DIR: ${{ secrets.VM_APP_DIR }}
+          # Empty on push; only a manual run can allow a Compose configuration change.
+          ALLOW_CONFIG_CHANGE: ${{ inputs.allow_config_change }}
+        # The script travels over stdin, so the VM runs the version from this commit.
+        run: >-
+          ssh vm bash -s --
+          "$(printf '%q' "$VM_APP_DIR")" "$GITHUB_SHA" main "$(printf '%q' "$ALLOW_CONFIG_CHANGE")"
+          < scripts/deploy.sh
+
+      - name: Public health checks
+        run: |
+          # check <path> <expected HTTP status regex> [required body text]
+          check() {
+            local url="$APP_URL$1" code body
+            for _ in $(seq 1 18); do
+              body=$(curl -sS --max-time 10 -w '\n%{http_code}' "$url" 2>/dev/null || true)
+              code=${body##*$'\n'}
+              if [[ $code =~ ^($2)$ ]] && [[ -z ${3:-} || $body == *"$3"* ]]; then
+                echo "OK   $url -> $code"
+                return 0
+              fi
+              sleep 10
+            done
+            echo "::error::Health check failed: $url returned '$code' (expected $2${3:+ containing $3})"
+            return 1
+          }
+          status=0
+          check /             200     'id="root"'       || status=1
+          check /ai/health    200     '"status":"ok"'   || status=1
+          check /api/alerts   '401|403'                 || status=1
+          exit $status
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

@@ -309,6 +309,8 @@ docker compose up -d --build
 
 Open **http://localhost** (or the `WEB_PORT` you set). On a server, point your domain / TLS-terminating proxy at that port.
 
+**Continuous deployment:** every push to `main` is tested and deployed to the production VM by [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Setup, secrets and rollback steps are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 **Seed the knowledge base once** (otherwise every alert escalates, because there is nothing to match against):
 
 ```bash

@@ -1,0 +1,47 @@
+# Sanitized example of the production override. The real file lives only on the VM as
+# docker-compose.override.yml (git-ignored) next to docker-compose.yml, and every
+# Compose command in scripts/deploy.sh uses both files.
+#
+# Image, ports, Caddyfile mount and volume names were verified on the production VM
+# (Docker Compose 2.40.3). No secrets belong in this file; they stay in .env.
+
+# Pinned so containers and volumes keep their names even if the folder is renamed.
+name: incident-triage-system
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped        # CONFIRM against the VM's docker-compose.yml (git diff)
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:                    # CONFIRM against the VM's docker-compose.yml (git diff)
+      - web
+
+  web:
+    # Caddy owns host ports 80/443; the dashboard is reached only through Caddy.
+    # `!reset` clears the base file's port list (needs Docker Compose 2.24+).
+    ports: !reset []
+    build:
+      args:
+        VITE_DEMO_LOGIN: ${SEED_DEMO_USERS:-false}
+
+  api:
+    environment:
+      APP_CORS_ALLOWED_ORIGINS: https://incidentsense.duckdns.org
+      SEED_DEMO_USERS: ${SEED_DEMO_USERS:-false}
+
+# Existing production volumes, pinned by their exact names: Caddy's certificates and
+# config, and the PostgreSQL data. Never rename these; a new name means an empty volume.
+volumes:
+  caddy_data:
+    name: incident-triage-system_caddy_data
+  caddy_config:
+    name: incident-triage-system_caddy_config
+  pgdata:
+    name: incident-triage-system_pgdata

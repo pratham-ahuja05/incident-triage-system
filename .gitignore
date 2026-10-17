@@ -6,3 +6,21 @@ __pycache__/
 # demo_seed.py local state
 demo_archived_ids.json
 demo_seeded_ids.json
+
+# VM-only production files (see docs/DEPLOYMENT.md); the sanitized example is deploy/
+/docker-compose.override.yml
+/Caddyfile
+
+# Backups and env variants can contain secrets (.env.example files stay tracked)
+*.bak
+*.backup
+*.orig
+.env.*
+!.env.example
+
+# SSH keys / certificates (deploy keys must never be committed)
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*deploy_key*
