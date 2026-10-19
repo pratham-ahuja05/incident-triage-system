@@ -12,7 +12,7 @@ export function ClipScene({ clip }) {
   const capIn = interpolate(frame, [0.3 * fps, 0.8 * fps], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   return (
-    <AbsoluteFill style={{ background: `radial-gradient(70% 60% at 50% 30%, rgba(91,141,239,0.12), transparent 70%), ${C.bg}`, fontFamily: FONT.sans, alignItems: "center", opacity: inOut }}>
+    <AbsoluteFill style={{ background: `radial-gradient(70% 60% at 50% 30%, rgba(232,134,58,0.12), transparent 70%), ${C.bg}`, fontFamily: FONT.sans, alignItems: "center", opacity: inOut }}>
       <div
         style={{
           marginTop: 70,

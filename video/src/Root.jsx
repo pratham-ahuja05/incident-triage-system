@@ -47,7 +47,7 @@ function Ad() {
 // 9:16 for Reels/Shorts: the same 16:9 film, scaled into the centre with the brand around it.
 function AdVertical() {
   return (
-    <AbsoluteFill style={{ background: "#0b0d10", justifyContent: "center", alignItems: "center" }}>
+    <AbsoluteFill style={{ background: "#12100e", justifyContent: "center", alignItems: "center" }}>
       <div style={{ width: 1920, height: 1080, transform: "scale(0.5625)", flexShrink: 0 }}>
         <Ad />
       </div>

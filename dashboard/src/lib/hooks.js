@@ -136,7 +136,9 @@ export function useTheme() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "light" ? "#f6f7f9" : "#0b0d10");
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "light" ? "#f4f3ee" : "#12100e");
     try {
       localStorage.setItem(THEME_KEY, theme);
     } catch {
@@ -144,6 +146,51 @@ export function useTheme() {
     }
   }, [theme]);
 
-  const toggle = useCallback(() => setTheme((t) => (t === "light" ? "dark" : "light")), []);
+  const toggle = useCallback(() => {
+    // Crossfade colours for the switch only; the class is removed so normal interactions stay snappy.
+    const root = document.documentElement;
+    root.classList.add("theme-anim");
+    window.setTimeout(() => root.classList.remove("theme-anim"), 400);
+    setTheme((t) => (t === "light" ? "dark" : "light"));
+  }, []);
   return [theme, toggle];
+}
+
+const prefersReducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Counts a numeric value up from 0 on first render and eases between later changes.
+ * Non-numeric values (e.g. "—") pass through untouched; the suffix of "70%" or "2.4h" is kept.
+ */
+export function useCountUp(value, duration = 700) {
+  const match =
+    typeof value === "number"
+      ? [String(value), String(value), ""]
+      : /^(-?\d+(?:\.\d+)?)(.*)$/.exec(String(value ?? ""));
+  const target = match ? Number(match[1]) : null;
+  const decimals = match && match[1].includes(".") ? match[1].split(".")[1].length : 0;
+  const [reduced] = useState(prefersReducedMotion);
+  const [shown, setShown] = useState(0);
+  const fromRef = useRef(0);
+
+  useEffect(() => {
+    if (target === null || reduced) return undefined;
+    const from = fromRef.current ?? 0;
+    const start = performance.now();
+    let frame;
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const next = from + (target - from) * eased;
+      setShown(next);
+      fromRef.current = next;
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [target, duration, reduced]);
+
+  if (target === null || reduced) return value;
+  const text = shown.toFixed(decimals);
+  return typeof value === "number" ? Number(text) : `${text}${match[2]}`;
 }

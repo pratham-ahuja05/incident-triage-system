@@ -22,16 +22,16 @@ function Node({ index, frame, fps, label, note, success, last }) {
           borderRadius: "50%",
           display: "grid",
           placeItems: "center",
-          background: done ? (active ? "rgba(91,141,239,0.16)" : color) : C.surface,
+          background: done ? (active ? "rgba(232,134,58,0.16)" : color) : C.surface,
           border: `3px solid ${done ? color : C.border}`,
           transform: `scale(${(done ? 0.75 + pop * 0.25 : 1) * pulse})`,
-          boxShadow: active ? `0 0 0 ${10 + 6 * Math.sin((frame - at) / 4)}px rgba(91,141,239,0.15)` : "none",
+          boxShadow: active ? `0 0 0 ${10 + 6 * Math.sin((frame - at) / 4)}px rgba(232,134,58,0.15)` : "none",
           zIndex: 1,
         }}
       >
         {done && !active ? (
           <svg width="34" height="34" viewBox="0 0 16 16" fill="none">
-            <path d="m3.5 8.5 3 3 6-7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="m3.5 8.5 3 3 6-7" stroke={C.onAccent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         ) : (
           <div style={{ width: 14, height: 14, borderRadius: "50%", background: done ? C.accent : C.border }} />

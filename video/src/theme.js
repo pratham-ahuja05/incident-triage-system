@@ -1,26 +1,30 @@
-import { loadFont as loadSans } from "@remotion/google-fonts/IBMPlexSans";
-import { loadFont as loadMono } from "@remotion/google-fonts/IBMPlexMono";
+import { loadFont as loadSans } from "@remotion/google-fonts/SourceSans3";
+import { loadFont as loadMono } from "@remotion/google-fonts/SourceCodePro";
 
-// Same palette and fonts as the dashboard's dark theme.
+// Same palette and fonts as the dashboard's dark "Ember" theme.
 const sans = loadSans("normal", { weights: ["400", "500", "600", "700"], subsets: ["latin"] });
 const mono = loadMono("normal", { weights: ["400", "500", "600"], subsets: ["latin"] });
 
 export const FONT = { sans: sans.fontFamily, mono: mono.fontFamily };
 
 export const C = {
-  bg: "#0b0d10",
-  bgElevated: "#101318",
-  surface: "#14171c",
-  surface2: "#1a1e26",
-  border: "#2a303a",
-  borderStrong: "#3a4250",
-  text: "#e8eaee",
-  muted: "#9aa3b2",
-  dim: "#808a9b",
-  accent: "#5b8def",
-  success: "#3dba7e",
-  danger: "#e5484d",
-  warning: "#e8a23a",
+  bg: "#12100e",
+  bgElevated: "#171411",
+  surface: "#1c1916",
+  surface2: "#24201c",
+  border: "#342e28",
+  borderStrong: "#4d453c",
+  text: "#f2ebe2",
+  muted: "#b4a897",
+  dim: "#968a7b",
+  accent: "#e8863a",
+  onAccent: "#1d1108",
+  success: "#93c36d",
+  danger: "#f2545f",
+  warning: "#e9c25a",
 };
 
 export const FPS = 30;
+
+// Accent glow at a given opacity, for radial backdrops and focus rings.
+export const accentGlow = (alpha) => `rgba(232, 134, 58, ${alpha})`;

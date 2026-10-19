@@ -4,6 +4,7 @@ import { Avatar, PriorityIcon, TicketStatus } from "./TicketBits";
 import { IconSparkle } from "./Icons";
 import { relativeTime } from "../lib/format";
 import { useNow } from "../lib/pipeline";
+import { useCountUp } from "../lib/hooks";
 import { TICKET_STATUSES, dueState, formatDue, isDone, toDate } from "../lib/workflow";
 
 const DAYS = 14;
@@ -86,10 +87,11 @@ function Delta({ current, previous, goodWhen = "down", unit = "", suffix = "vs l
 }
 
 function Kpi({ label, value, tone, delta, spark, sparkLabel, children }) {
+  const shown = useCountUp(value);
   return (
     <article className="kpi">
       <span className="kpi-label">{label}</span>
-      <span className={`kpi-value ${tone ? `kpi-${tone}` : ""}`}>{value}</span>
+      <span className={`kpi-value ${tone ? `kpi-${tone}` : ""}`}>{shown}</span>
       {delta}
       {spark && (
         <div className="kpi-trend">
@@ -339,7 +341,7 @@ function OverviewView({ store, me, onOpen, onNavigate }) {
 
     const withDue = alerts.filter((a) => a.dueAt);
     const breached = withDue.filter((a) =>
-      a.resolvedAt ? toDate(a.resolvedAt) > toDate(a.dueAt) : !isDone(a) && toDate(a.dueAt).getTime() < now
+      a.resolvedAt ? toDate(a.resolvedAt) > toDate(a.dueAt) : !isDone(a) && toDate(a.dueAt).getTime() < now,
     ).length;
     const decidedAll = alerts.filter((a) => a.decision);
 
@@ -465,7 +467,10 @@ function OverviewView({ store, me, onOpen, onNavigate }) {
           sparkLabel="per day · 14 d"
         />
         <Kpi label="Overdue (SLA)" value={m.overdue.length} tone={m.overdue.length ? "danger" : undefined}>
-          <div className="kpi-meter" title="Incidents with a due date that are not past it (open) or were resolved before it">
+          <div
+            className="kpi-meter"
+            title="Incidents with a due date that are not past it (open) or were resolved before it"
+          >
             <div className="meter-track">
               <div
                 className={`meter-fill ${m.sla == null ? "" : m.sla >= 90 ? "meter-good" : m.sla >= 70 ? "meter-warn" : "meter-bad"}`}
@@ -473,9 +478,7 @@ function OverviewView({ store, me, onOpen, onNavigate }) {
               />
             </div>
             <span className="kpi-trend-label">
-              {m.sla == null
-                ? "No incidents have a due date yet"
-                : `${m.sla}% within SLA · ${m.slaN} with a due date`}
+              {m.sla == null ? "No incidents have a due date yet" : `${m.sla}% within SLA · ${m.slaN} with a due date`}
             </span>
           </div>
         </Kpi>

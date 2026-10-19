@@ -17,7 +17,7 @@ export function Outro() {
         fontFamily: FONT.sans,
         justifyContent: "center",
         alignItems: "center",
-        background: `radial-gradient(55% 45% at 50% 40%, rgba(91,141,239,0.16), transparent 70%), ${C.bg}`,
+        background: `radial-gradient(55% 45% at 50% 40%, rgba(232,134,58,0.16), transparent 70%), ${C.bg}`,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 28, opacity: pop, transform: `scale(${0.9 + pop * 0.1})` }}>

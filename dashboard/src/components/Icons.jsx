@@ -1,9 +1,17 @@
-export function IconMark() {
+// Brand mark: an alert's pulse spikes, settles, and resolves into a single decision dot.
+export function IconMark({ size = 18 }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M8 2.5 14 13.5H2L8 2.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-      <path d="M8 6.5v3.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      <circle cx="8" cy="11.4" r="0.7" fill="currentColor" />
+    <svg className="logo-mark" width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        className="logo-pulse"
+        pathLength="1"
+        d="M2.5 13h4l2.2-6.5 3.6 11 2.6-8 1.6 3.5h1.5"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle className="logo-dot" cx="20.4" cy="13" r="1.9" fill="currentColor" />
     </svg>
   );
 }
@@ -59,7 +67,13 @@ export function IconClose() {
 export function IconBack() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M10 3.5 4.5 8 10 12.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M10 3.5 4.5 8 10 12.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

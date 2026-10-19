@@ -43,7 +43,12 @@ export function formatDue(alert, now = Date.now()) {
   if (!due) return "";
   const diff = due.getTime() - now;
   const abs = Math.abs(diff);
-  const unit = abs < 3600e3 ? [Math.round(abs / 60e3), "m"] : abs < 86400e3 ? [Math.round(abs / 3600e3), "h"] : [Math.round(abs / 86400e3), "d"];
+  const unit =
+    abs < 3600e3
+      ? [Math.round(abs / 60e3), "m"]
+      : abs < 86400e3
+        ? [Math.round(abs / 3600e3), "h"]
+        : [Math.round(abs / 86400e3), "d"];
   if (isDone(alert)) return due.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return diff < 0 ? `${unit[0]}${unit[1]} overdue` : `due in ${unit[0]}${unit[1]}`;
 }
@@ -67,7 +72,8 @@ export function initials(name) {
 }
 
 // Stable color per person, from a small palette that reads on both themes.
-const AVATAR_HUES = [212, 152, 32, 280, 350, 190, 100, 250];
+// Earthy hues that sit inside the warm Ember / Signal palettes rather than fighting them.
+const AVATAR_HUES = [18, 36, 78, 150, 176, 205, 330, 2];
 export function avatarHue(name) {
   let h = 0;
   for (const ch of name || "") h = (h * 31 + ch.charCodeAt(0)) >>> 0;
