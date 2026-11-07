@@ -1,0 +1,12 @@
+# Offline unit tests (tests/): the AI service's deps minus torch/sentence-transformers, which the tests stub out.
+pytest==9.2.0
+fastapi==0.141.1
+pydantic==2.13.4
+python-dotenv==1.2.2
+SQLAlchemy==2.0.51
+psycopg2-binary==2.9.12
+pgvector==0.5.0
+numpy==2.5.2
+groq==1.6.0
+requests==2.34.2
+httpx==0.28.1

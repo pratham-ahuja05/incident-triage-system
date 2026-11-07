@@ -1,0 +1,100 @@
+{"source_id": 19, "alert": "AUTH_ERROR: Login rejected for principal 'jdoe'; HTTP 401 Unauthorized"}
+{"source_id": 122, "alert": "CRIT: ens33 carrier lost; 5 link state changes observed in 90s; suspect uplink switch issue."}
+{"source_id": 106, "alert": "2026-10-05 14:22:11.102 UTC | FATAL: deadlock detected\nDETAIL: Process 8821 waits for ExclusiveLock on transaction 554433; blocked by process 8822.\nHINT: Cancel one of the transactions."}
+{"source_id": 81, "alert": "FATAL: connection to master DB failed: socket timeout after 45s connecting to 192.168.1.10:5432"}
+{"source_id": 143, "alert": "TokenValidationException: SignatureMismatch (status 401) - JWT verification failed for user_id=4521"}
+{"source_id": 156, "alert": "2026-10-05T11:15:30Z WARN REPLICATION_DELAY: replica-node-5 is 18 seconds behind primary"}
+{"source_id": 148, "alert": "ConnectTimeout: TCP handshake to 172.16.5.9:8080 timed out after 20s; check network ACLs."}
+{"source_id": 63, "alert": "Exception in thread 'http-nio-8080-exec-1' java.lang.NoClassDefFoundError: com/fasterxml/jackson/databind/ObjectMapper at com.acme.ApiHandler.process(ApiHandler.java:42)"}
+{"source_id": 31, "alert": "ERROR 1452 (23000): Integrity constraint violation: a foreign key constraint fails (`db`.`orders`)"}
+{"source_id": 133, "alert": "2026-10-02T14:22:19Z ERROR gateway-auth: Token validation error for uid=98765: invalid signature"}
+{"source_id": 98, "alert": "Login rejected: account=svc_backup, reason=BAD_PASSWORD, ip=192.168.1.45"}
+{"source_id": 101, "alert": "2026-11-05 11:30:45.678 UTC | FATAL:  could not create shared memory segment for lock table: out of memory\nDETAIL:  Failed process ID 8921.\nHINT:  Increase max_locks_per_transaction or reduce concurrent sessions."}
+{"source_id": 3, "alert": "Interface ens33 is down, 150 packets dropped"}
+{"source_id": 14, "alert": "ConnectionTimeout: Failed to establish connection to DB within 3000ms"}
+{"source_id": 38, "alert": "javax.net.ssl.SSLHandshakeException: sun.security.validator.ValidatorException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target"}
+{"source_id": 166, "alert": "Timeout connecting to Postgres primary node, retrying after 45s"}
+{"source_id": 55, "alert": "org.apache.kafka.common.errors.TimeoutException: Timeout expired while fetching topics metadata"}
+{"source_id": 74, "alert": "java.lang.NullPointerException at com.acme.OrderProcessor.process(OrderProcessor.java:456)"}
+{"source_id": 136, "alert": "ORA-01555: snapshot too old: rollback segment number 7"}
+{"source_id": 69, "alert": "java.net.SocketException: Connection reset by peer"}
+{"source_id": 47, "alert": "ORA-12519: TNS:no appropriate service handler found"}
+{"source_id": 1, "alert": "Error 500: Database connection timeout"}
+{"source_id": 18, "alert": "Caused by: java.sql.SQLSyntaxErrorException: ORA-00942: table or view does not exist at com.acme.dao.UserDAO.fetchUsers(UserDAO.java:123)"}
+{"source_id": 45, "alert": "Network interface eth1 down: no carrier"}
+{"source_id": 154, "alert": "java.lang.NullPointerException\n\tat com.acme.order.OrderService.create(OrderService.java:45)\n\tat com.acme.api.Controller.process(Controller.java:78)"}
+{"source_id": 46, "alert": "Login failed: invalid username or password"}
+{"source_id": 20, "alert": "java.lang.OutOfMemoryError: GC overhead limit exceeded at java.lang.StringBuffer.<init>(StringBuffer.java:88)"}
+{"source_id": 121, "alert": "2026-10-04T14:22:10Z [db-replica-2] FATAL: deadlock detected on table inventory; transaction rolled back (SQLSTATE 40001)"}
+{"source_id": 150, "alert": "Node 'node-12' kubelet error: failed to start pod sandbox: rpc error: code = Unknown desc = failed to create containerd task: OCI runtime create failed: runc: unable to start container process: exec: \"/entrypoint.sh\": permission denied"}
+{"source_id": 52, "alert": "java.lang.NullPointerException at com.acme.service.DataProcessor.process(DataProcessor.java:45)"}
+{"source_id": 108, "alert": "2026-10-05 08:30:12.550 UTC | AUTH FAILURE: Repeated invalid password attempts for user 'root' from IP 198.51.100.23 (15 attempts in 3 minutes). Account suspended."}
+{"source_id": 191, "alert": "Unable to establish connection to Postgres master db-master-2, scheduling retry in 45s"}
+{"source_id": 117, "alert": "CoreDNS instances logging \"i/o timeout\" errors while resolving internal service \"auth.prod.svc.cluster.local\"."}
+{"source_id": 4, "alert": "ZeroDivisionError: integer division or modulo by zero at line 102 in file math_utils.py"}
+{"source_id": 152, "alert": "ALERT: High network latency observed on interface eth1: avg RTT 320ms (threshold 150ms)"}
+{"source_id": 123, "alert": "AUTH_ERR: Token validation failed for principal 'svc-batch' (src: 192.168.1.102) - signature mismatch (code 0xB204)"}
+{"source_id": 33, "alert": "Login rejected: bad username or password"}
+{"source_id": 142, "alert": "ALERT: eth0: High packet drop rate (18%) detected, jitter increasing, suspect upstream gateway failure."}
+{"source_id": 173, "alert": "GCS UploadObject PermissionDenied for bucket acme-media-prod following service account key rotation"}
+{"source_id": 84, "alert": "ERROR: NullPointerException in com.corp.auth.TokenValidator.verify(TokenValidator.java:42)"}
+{"source_id": 68, "alert": "Auth error: incorrect login credentials"}
+{"source_id": 109, "alert": "2026-10-05 08:15:22.101 | SYS-MONITOR WARN: Heap memory usage rising, potential leak. Heap grew from 512MB to 2.1GB in 45 minutes."}
+{"source_id": 64, "alert": "CRITICAL: Volume /dev/vdb1 utilization at 92% (threshold: 90%)"}
+{"source_id": 165, "alert": "K8s Node Warning: node-192-168-1-55 is NotReady; kubelet heartbeat missed for 5m"}
+{"source_id": 110, "alert": "2026-10-02 11:20:45.112 [ALERT] TempSensor-04: 88.5°C detected, limit 80°C breached"}
+{"source_id": 132, "alert": "Oct 05 09:15:33 web-srv-02 kernel: eth0: carrier lost (timeout)"}
+{"source_id": 129, "alert": "LB Error: 502 Bad Gateway; upstream 'auth-service' unreachable (ECONNREFUSED)"}
+{"source_id": 134, "alert": "Thread 'pool-1-thread-2' threw java.lang.NullPointerException in com.acme.core.OrderService.process(OrderService.java:42)"}
+{"source_id": 17, "alert": "HTTP/2 503 Service Unavailable"}
+{"source_id": 141, "alert": "2026-09-15T10:12:05Z ERR: DB_POOL_EXHAUSTED: No connection available after 30s; stmt: SELECT * FROM orders WHERE uid=99887"}
+{"source_id": 77, "alert": "DB Connection Failure: Timeout reached after 3000ms"}
+{"source_id": 80, "alert": "Interface ens33 experiencing 20% packet loss"}
+{"source_id": 138, "alert": "AUTH_FAIL: User 'root' rejected from 198.51.100.22 (HTTP 401)"}
+{"source_id": 151, "alert": "2026-10-05T14:22:10Z CRIT DB_TIMEOUT: Postgres replica (172.16.5.9:5432) connection timeout after 30s"}
+{"source_id": 26, "alert": "401 Unauthorized: Missing or invalid auth token in request headers"}
+{"source_id": 67, "alert": "500 Internal Error: NullPointerException thrown in com.acme.ApiHandler.process(ApiHandler.java:88)"}
+{"source_id": 70, "alert": "MySQL driver init failed: CommunicationsException - Lost connection to database server"}
+{"source_id": 125, "alert": "Pod redis-6d8f9a7b5c-9lmn terminated: OOMKilled (memory limit 256Mi exceeded)"}
+{"source_id": 28, "alert": "com.acme.Service$Handler$$EnhancerBySpringCGLIB$$a1b2c3d4.execute(Unknown Source)"}
+{"source_id": 115, "alert": "Node worker-04 marked NotReady due to DiskPressure; pods evicted, node offline"}
+{"source_id": 54, "alert": "Interface ens33 is down; gateway 192.168.1.1 unreachable"}
+{"source_id": 5, "alert": "ORA-12519: TNS:no appropriate service handler found (CONNECTION_ID=8821)"}
+{"source_id": 107, "alert": "2026-10-02 14:12:05.442 | netmon WARN: Packet loss > 5% on interface eth1 for 45 seconds (avg 9.1%)."}
+{"source_id": 161, "alert": "SSL certificate expired for domain cdn.media.example, handshake failed for 450 clients"}
+{"source_id": 44, "alert": "java.lang.OutOfMemoryError: GC overhead limit exceeded\nat com.acme.DataLoader.load(DataLoader.java:89)\nat com.acme.App.main(App.java:12)"}
+{"source_id": 190, "alert": "SMTP relay rejected 850 messages: 421 Too many connections from 192.168.1.55"}
+{"source_id": 144, "alert": "java.lang.NullPointerException\n\tat com.acme.billing.InvoiceService.generate(InvoiceService.java:204)\n\tat com.acme.api.BillingController.create(BillingController.java:33)"}
+{"source_id": 95, "alert": "KERNEL PANIC: CPU 5: Machine Check Exception: 0x00000000000000b2 (Bank 2) at 0x00000000a1c3d4"}
+{"source_id": 105, "alert": "2026-10-02 09:15:12.101 +0000 | HARDWARE: Disk /dev/sdc failed SMART check (Reallocated_Sector_Ct > 0). Immediate replacement required."}
+{"source_id": 158, "alert": "Auth token validation failed: signature mismatch for token id xyz789uvw012"}
+{"source_id": 32, "alert": "java.net.ConnectException: Connection refused at java.net.SocksSocketImpl.connect(SocksSocketImpl.java:392)"}
+{"source_id": 130, "alert": "ALERT: MySQL data directory /var/lib/mysql-data is 91% full on server db-primary-01; threshold exceeded."}
+{"source_id": 22, "alert": "javax.net.ssl.SSLHandshakeException: sun.security.validator.ValidatorException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target"}
+{"source_id": 83, "alert": "AuthError: JWT verification failed for uid=98765, reason=BAD_SIGNATURE"}
+{"source_id": 10, "alert": "TLS certificate for api.myservice.io has expired, cert_id: 9876543210"}
+{"source_id": 88, "alert": "WARN: Unauthorized access attempt detected for account 'root' originating from 10.0.0.45"}
+{"source_id": 36, "alert": "com.amazonaws.AmazonServiceException: The AWS Access Key Id you provided does not exist in our records. (Service: Amazon S3; Status Code: 403; Error Code: InvalidAccessKeyId)"}
+{"source_id": 91, "alert": "2026-10-02T14:22:10Z [FATAL] pg-node-04: shmget failed: ENOSPC (No space left on device)"}
+{"source_id": 140, "alert": "CRITICAL: Volume /dev/vdb1 utilization at 95% (limit 90%)"}
+{"source_id": 48, "alert": "503 Service Unavailable: upstream backend unreachable"}
+{"source_id": 50, "alert": "DNS lookup error: host 'api-gateway.prod' not found"}
+{"source_id": 21, "alert": "Connection timeout to MySQL host 'db-prod-2' exceeded 30s limit"}
+{"source_id": 118, "alert": "Security Alert: IP 198.51.100.23 triggered brute-force protection (15 attempts in 20s)"}
+{"source_id": 87, "alert": "NXDOMAIN returned for query: auth-service.internal"}
+{"source_id": 131, "alert": "2026-10-02T14:22:05Z WARN: Connection pool saturated: max_connections=150 reached"}
+{"source_id": 170, "alert": "Payload validation failed: Invalid JSON at char 409 in 'user-actions' stream"}
+{"source_id": 127, "alert": "SERVFAIL: DNS query for 'logging-agent' timed out after 5 retries"}
+{"source_id": 13, "alert": "HTTP 500 Internal Server Error: NullPointerException thrown in org.acme.web.UserController.processRequest(UserController.java:456)"}
+{"source_id": 126, "alert": "Replication lag alert: standby node db-standby-7 is 245 seconds behind primary."}
+{"source_id": 128, "alert": "Authentication failure: user 'asmith' locked due to 7 consecutive failed password attempts."}
+{"source_id": 104, "alert": "Exception in thread \"http-nio-8080-exec-1\" java.lang.NullPointerException at com.corp.billing.InvoiceService.generate(InvoiceService.java:201) at com.corp.gateway.ApiRouter.route(ApiRouter.java:88)"}
+{"source_id": 30, "alert": "Request timeout: no response received from 'auth-service' (limit: 15s, retries: 5)"}
+{"source_id": 6, "alert": "Security Notice: Suspected SQL injection pattern found in input at line 45 in file profile.js"}
+{"source_id": 96, "alert": "ORA-01555: snapshot too old: rollback segment number 5678 with name \"SYS_ROLLBACK_02\" is too old"}
+{"source_id": 137, "alert": "2026-10-02T14:22:10Z WARN [lb-04] Health check timeout for upstream node 172.16.8.12:8080 (503)"}
+{"source_id": 49, "alert": "org.apache.kafka.common.KafkaException: Failed to connect to broker at 10.5.5.5:9092\n\tat org.apache.kafka.clients.NetworkClient.initiateConnect(NetworkClient.java:450)\n\tat org.apache.kafka.clients.NetworkClient.ready(NetworkClient.java:210)"}
+{"source_id": 116, "alert": "ALERT: Replication delay exceeded 45s on node pg-replica-02. WAL stream interrupted (exit 1). Last LSN: 0/4A1B2C3D."}
+{"source_id": 86, "alert": "ERROR 1213 (40001): Deadlock detected while acquiring row lock; aborting current transaction"}
+{"source_id": 112, "alert": "BGP neighbor 203.0.113.5 down: Keepalive timer expired. Prefixes removed from RIB, causing routing blackhole for 90s."}
+{"source_id": 39, "alert": "ERROR: relation \"users_archive\" does not exist at character 15"}

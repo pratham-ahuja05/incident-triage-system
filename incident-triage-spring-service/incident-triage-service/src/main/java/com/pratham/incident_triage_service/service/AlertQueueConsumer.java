@@ -13,6 +13,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -36,13 +38,33 @@ public class AlertQueueConsumer {
     @Value("${python.service.url}")
     private String pythonServiceUrl;
 
+    // BRPOP hands each alert id to exactly one worker, so workers can run in parallel safely.
+    @Value("${app.queue.consumers:4}")
+    private int consumers;
+
+    // Upper bound on one /triage call; without it a hung AI service would pin a worker forever.
+    @Value("${app.triage.timeout-seconds:90}")
+    private long triageTimeoutSeconds;
+
+    // In-flight alerts untouched for this long are re-queued (must exceed the triage timeout).
+    @Value("${app.queue.stale-after-seconds:300}")
+    private long staleAfterSeconds;
+
+    @Value("${app.queue.sweep-interval-seconds:30}")
+    private long sweepIntervalSeconds;
+
     private volatile boolean running = true;
 
     @PostConstruct
     public void startConsumerThread() {
-        Thread consumerThread = new Thread(this::consumeLoop, "alert-queue-consumer");
-        consumerThread.setDaemon(true);
-        consumerThread.start();
+        for (int i = 1; i <= consumers; i++) {
+            Thread consumerThread = new Thread(this::consumeLoop, "alert-queue-consumer-" + i);
+            consumerThread.setDaemon(true);
+            consumerThread.start();
+        }
+        Thread sweeper = new Thread(this::sweepLoop, "alert-queue-sweeper");
+        sweeper.setDaemon(true);
+        sweeper.start();
     }
 
     // Stop polling Redis once the context shuts down (otherwise the loop spins on a destroyed connection factory).
@@ -71,13 +93,44 @@ public class AlertQueueConsumer {
         }
     }
 
+    // Recovers alerts orphaned by a crash mid-triage or a failed re-enqueue (e.g. Redis down during a retry).
+    private void sweepLoop() {
+        while (running) {
+            try {
+                Thread.sleep(sweepIntervalSeconds * 1000);
+                recoverStaleAlerts();
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                if (!running) break;
+                System.err.println("Sweeper error: " + e.getMessage());
+            }
+        }
+    }
+
+    void recoverStaleAlerts() {
+        LocalDateTime cutoff = LocalDateTime.now().minusSeconds(staleAfterSeconds);
+        for (Long id : alertRepository.findStaleInFlight(cutoff)) {
+            if (redisTemplate.opsForList().indexOf(QUEUE_KEY, id.toString()) != null) continue; // queued, just waiting
+            Optional<Alert> optionalAlert = alertRepository.findById(id);
+            if (optionalAlert.isEmpty()) continue;
+            Alert alert = optionalAlert.get();
+            String was = alert.getStatus();
+            alert.setStatus("PENDING");
+            alertRepository.save(alert);
+            workflow.log(id, "RECOVERED", "system", "Found stuck in " + was + "; re-queued for triage");
+            alertQueueProducer.enqueue(id);
+        }
+    }
+
     private void processAlert(Long alertId) {
+        // Duplicate queue entries (sweeper + retry racing) and already-finished alerts are skipped here.
+        if (alertRepository.claimForProcessing(alertId, LocalDateTime.now()) == 0) return;
         Optional<Alert> optionalAlert = alertRepository.findById(alertId);
         if (optionalAlert.isEmpty()) return;
 
         Alert alert = optionalAlert.get();
-        alert.setStatus("PROCESSING");
-        alertRepository.save(alert);
         workflow.log(alertId, "PROCESSING", "system",
                 "Attempt " + (alert.getRetryCount() + 1) + " picked up by a triage worker");
         broadcaster.broadcastUpdate();
@@ -91,7 +144,11 @@ public class AlertQueueConsumer {
                     .bodyValue(requestBody)
                     .retrieve()
                     .bodyToMono(TriageResponse.class)
+                    .timeout(Duration.ofSeconds(triageTimeoutSeconds))
                     .block();
+            if (response == null || response.getDecision() == null) {
+                throw new IllegalStateException("AI service returned an empty triage response");
+            }
 
             TriageResult result = new TriageResult();
             result.setAlertId(alertId);
@@ -156,6 +213,9 @@ public class AlertQueueConsumer {
                 Thread.sleep(backoffMillis);
                 alertQueueProducer.enqueue(alertId);
             } catch (InterruptedException ignored) {
+            } catch (Exception e) {
+                // Redis unavailable: the alert stays PENDING and the sweeper re-queues it later.
+                System.err.println("Retry enqueue failed for alert " + alertId + ": " + e.getMessage());
             }
         });
         retryThread.setDaemon(true);

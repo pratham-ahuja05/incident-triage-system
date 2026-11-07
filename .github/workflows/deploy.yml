@@ -82,7 +82,12 @@ jobs:
           fi
 
       - name: Python syntax check
-        run: python3 -m py_compile ./*.py
+        run: python3 -m py_compile ./*.py eval/*.py loadtest/*.py
+
+      - name: AI service tests (LLM fallbacks and guardrails, offline)
+        run: |
+          python3 -m pip install -q -r requirements-test.txt
+          python3 -m pytest tests -q
 
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:

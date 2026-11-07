@@ -7,3 +7,6 @@ __pycache__
 .vscode
 dashboard
 incident-triage-spring-service
+eval
+loadtest
+tests

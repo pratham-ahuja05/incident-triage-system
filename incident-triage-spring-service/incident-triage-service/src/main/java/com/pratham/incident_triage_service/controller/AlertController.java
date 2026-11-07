@@ -28,7 +28,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import io.github.bucket4j.Bucket;
 
 @RestController
 @RequestMapping("/api/alerts")
@@ -41,15 +40,11 @@ public class AlertController {
     @Autowired private IncidentEventRepository eventRepository;
     @Autowired private IncidentWorkflowService workflow;
 
-    private final Bucket rateLimitBucket;
-
-    public AlertController(RateLimitConfig rateLimitConfig) {
-        this.rateLimitBucket = rateLimitConfig.createNewBucket();
-    }
+    @Autowired private RateLimitConfig rateLimiter;
 
     @PostMapping
     public ResponseEntity<?> ingestAlert(@Valid @RequestBody AlertRequest request) {
-        if (!rateLimitBucket.tryConsume(1)) {
+        if (!rateLimiter.tryConsume(IncidentWorkflowService.currentUser())) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body("Rate limit exceeded. Please slow down.");
         }
@@ -61,7 +56,12 @@ public class AlertController {
         Alert saved = alertRepository.save(alert);
         workflow.log(saved.getId(), "CREATED", saved.getReporter(), "Reported from " + saved.getSource());
 
-        alertQueueProducer.enqueue(saved.getId());
+        try {
+            alertQueueProducer.enqueue(saved.getId());
+        } catch (Exception e) {
+            // The alert is already persisted as PENDING; the queue's recovery sweeper will enqueue it.
+            System.err.println("Enqueue failed for alert " + saved.getId() + ", leaving it to the sweeper: " + e.getMessage());
+        }
         broadcaster.broadcastUpdate();
 
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(saved);
@@ -184,3 +184,4 @@ public class AlertController {
         return broadcaster.subscribe();
     }
 }
+

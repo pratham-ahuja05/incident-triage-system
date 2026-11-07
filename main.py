@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from classifier import classify_incident
-from agent import make_decision
+from agent import triage
 from embeddings import generate_embedding
 from investigation import LLMUnavailable, investigate
 from models import SessionLocal, PastIncident, init_db
@@ -91,15 +91,10 @@ async def classify_alert(request: ClassifyRequest):
     return ClassifyResponse(**result)
 
 
+# Sync def: FastAPI runs it in a worker thread, so concurrent triage requests don't block each other.
 @app.post("/triage")
-async def triage_alert(request: TriageRequest):
-    result = make_decision(request.log_message)
-    t = time.perf_counter()
-    classification = classify_incident(request.log_message)
-    result["timings_ms"]["classify"] = int((time.perf_counter() - t) * 1000)
-    result["severity"] = classification.get("severity", "unknown")
-    result["category"] = classification.get("category", "unknown")
-    return result
+def triage_alert(request: TriageRequest):
+    return triage(request.log_message)
 
 
 class InvestigateRequest(BaseModel):

@@ -1,0 +1,19 @@
+{"source_id": 57, "alert": "Exception in thread \"worker-1\" java.lang.OutOfMemoryError: GC overhead limit exceeded"}
+{"source_id": 34, "alert": "com.mysql.cj.jdbc.exceptions.CommunicationsException: The last packet successfully received from the server was 12,345 milliseconds ago. The last packet sent successfully to the server was 0 milliseconds ago. is longer than the server configured value of 'wait_timeout'"}
+{"source_id": 40, "alert": "java.lang.OutOfMemoryError: GC overhead limit exceeded"}
+{"source_id": 89, "alert": "Traceback (most recent call last):\n  File \"/srv/app/core.py\", line 112, in <module>\n    start_service()\n  File \"/srv/app/service.py\", line 204, in start_service\n    raise ValueError('Invalid configuration')\nValueError: Invalid configuration"}
+{"source_id": 82, "alert": "ConnectionTimeout: TCP handshake to 192.168.1.15:8080 timed out after 30s; socket error ECONNREFUSED"}
+{"source_id": 15, "alert": "java.net.ConnectException: No route to host at java.net.PlainSocketImpl.socketConnect(Native Method)"}
+{"source_id": 139, "alert": "Traceback (most recent call last):\n  File \"/srv/api/handler.py\", line 105, in <module>\n    raise KeyError('Session not found')\nKeyError: 'Session not found'"}
+{"source_id": 56, "alert": "HTTP 502 Bad Gateway, failed to establish connection to reverse proxy"}
+{"source_id": 146, "alert": "2026-10-05T09:45:33Z ERR 500: Malformed JSON body in order-processing service: Unexpected token in JSON at position 0"}
+{"source_id": 147, "alert": "MySQL Error 1062: Duplicate entry 'inv_9921' for key 'PRIMARY' (SQL: insert into invoices ...)"}
+{"source_id": 100, "alert": "CRITICAL: Volume /var/lib/containerd is at 94% capacity on node-12 (total=500GiB, used=470GiB)"}
+{"source_id": 102, "alert": "Oct 04 14:22:10 dns-server-02 named[1204]: query timed out for 'svc.prod.internal' after 3000ms, retrying (attempt 2/4)"}
+{"source_id": 153, "alert": "LoginService - Authentication failed for user 'asmith' from 172.16.5.10: status 0x80070005"}
+{"source_id": 111, "alert": "2026-10-05T14:22:10Z CRITICAL [PostgreSQL] Deadlock detected while acquiring lock; transaction aborted. Trace: org.postgresql.util.PSQLException: Deadlock detected ..."}
+{"source_id": 90, "alert": "Storage Alert: /data/postgres volume at 95% capacity (device=/dev/vdb1)"}
+{"source_id": 163, "alert": "Connection Error: Failed to establish link to Memcached at cache-node-02:11211, connection reset by peer"}
+{"source_id": 78, "alert": "GET /v1/resources HTTP/2.0 403 Forbidden"}
+{"source_id": 119, "alert": "2026-10-02T08:15:33Z CRITICAL java.lang.OutOfMemoryError: GC overhead limit exceeded\n\tat com.payments.TransactionHandler.process(TransactionHandler.java:450)\n\tat java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)"}
+{"source_id": 85, "alert": "KERNEL PANIC: CPU 5: soft lockup - CPU#5 stuck for 22s! [kworker/5:1:1234] RIP: 0010:schedule+0x2f/0x90"}

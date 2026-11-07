@@ -253,28 +253,22 @@ Triage Project/
 
 ## How the Decision Logic Works
 
-For every alert, the AI service runs a two-stage decision process:
+Triage is an LLM agent with **function calling** ([agent.py](agent.py)). It has three tools:
 
-1. **Retrieve** the single closest past incident from `past_incidents` using pgvector's cosine distance operator (`<=>`) against the alert's embedding.
-2. **Threshold pre-filter** — if the distance exceeds a tuned cutoff (currently `0.4`), the candidate is too dissimilar and the alert is escalated immediately, without spending an LLM call.
-3. **LLM verification** — if the candidate passes the threshold, the LLM is given both the new alert and the candidate incident and asked to judge whether they're genuinely the same underlying issue. This catches cases where vector search finds something numerically close but conceptually different.
-4. **Fail-safe default** — if the LLM's response can't be parsed as valid JSON, the system defaults to escalation rather than trusting an unverified match.
+| Tool | What it does |
+|---|---|
+| `search_past_incidents(query)` | pgvector cosine search over resolved incidents; the agent may search again with a reformulated query |
+| `suggest_fix(incident_id, severity, category, reasoning)` | final decision: a retrieved incident is the same problem, so its resolution applies |
+| `escalate(severity, category, reasoning)` | final decision: nothing retrieved is genuinely the same problem |
 
-```python
-DISTANCE_THRESHOLD = 0.4
+Guardrails are enforced in code, not trusted to the prompt:
 
-def make_decision(alert_message: str) -> dict:
-    top_match, distance = get_top_match_with_distance(alert_message)
+1. `suggest_fix` must cite an incident that search actually returned, within a cosine distance of `0.4`; otherwise the alert is escalated.
+2. Severity and category outside the allowed values become `unknown`; the loop is capped at 4 steps.
+3. **Provider down or rate-limited** → escalate without AI. **Malformed agent output** (no tool call, bad arguments, hallucinated tool) → fall back to the fixed pipeline: retrieve top-1 → threshold → LLM yes/no → classify (`AGENT_MODE=pipeline` runs this pipeline directly).
+4. A wrong fix costs more than an escalation, so every uncertain path ends in escalation.
 
-    if top_match is None or distance > DISTANCE_THRESHOLD:
-        return escalate(...)
-
-    llm_verdict = llm_confirm_match(alert_message, top_match)
-    if llm_verdict["is_match"]:
-        return auto_suggest_fix(...)
-    else:
-        return escalate(...)
-```
+Measured accuracy, load and failure-injection results, and how to reproduce them: **[docs/EVALUATION.md](docs/EVALUATION.md)**.
 
 ---
 
@@ -500,8 +494,8 @@ Interactive docs available at `localhost:8000/docs` (auto-generated Swagger UI).
 
 ## Known Limitations
 
-- The knowledge base is bootstrapped from LLM-generated synthetic incidents, not real production data — no measured accuracy claim is made.
-- Queue delivery is at-most-once (`BRPOP` removes on read); a consumer crash mid-processing can leave an alert stuck in `PROCESSING`. Redis Streams with consumer-group acknowledgment is a planned hardening step.
+- The knowledge base is bootstrapped from LLM-generated synthetic incidents, not real production data, so the measured accuracy in [docs/EVALUATION.md](docs/EVALUATION.md) is on synthetic data.
+- `BRPOP` removes an alert on read; a crash mid-triage is recovered by a sweeper that re-queues alerts idle in `PENDING`/`PROCESSING` (after 5 minutes by default), rather than by acknowledgement-based delivery such as Redis Streams.
 - The knowledge base does not currently distinguish seed data from human-approved learned entries.
 - Single-instance deployment; horizontal scaling of the consumer and SSE broadcaster would need Redis-backed coordination.
 
@@ -509,8 +503,7 @@ Interactive docs available at `localhost:8000/docs` (auto-generated Swagger UI).
 
 ## Roadmap
 
-- [ ] Redis Streams / delivery-guarantee hardening for the queue
-- [ ] Retry / dead-letter improvements beyond the current backoff-and-mark-failed behavior
+- [ ] Redis Streams with consumer-group acknowledgement, replacing the recovery sweeper
 - [ ] Deployment: Spring Boot + Python on Render/Railway, database on Supabase/Neon, frontend on Vercel
 - [ ] HNSW index on the embedding column for larger-scale retrieval
 - [ ] Source-tagging (seed vs. human-approved) in the knowledge base

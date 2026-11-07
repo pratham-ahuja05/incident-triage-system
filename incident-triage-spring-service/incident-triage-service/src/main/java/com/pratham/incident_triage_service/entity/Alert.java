@@ -78,9 +78,18 @@ public class Alert {
     )
     private Set<Alert> duplicates = new HashSet<>();
 
+    // Last write; the queue's recovery sweeper uses it to spot alerts stuck in PENDING/PROCESSING.
+    private LocalDateTime updatedAt;
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+        this.updatedAt = this.createdAt;
         if (this.status == null) {
             this.status = "PENDING";
         }

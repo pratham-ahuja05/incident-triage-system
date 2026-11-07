@@ -1,0 +1,143 @@
+{
+  "generated_at": "2026-11-07T18:12:36.631418+00:00",
+  "mode": "tools",
+  "model": "openai/gpt-oss-120b",
+  "cases_scored": 100,
+  "known_issue_cases": 60,
+  "novel_issue_cases": 40,
+  "decision_agreement": 0.85,
+  "auto_suggest_rate": 0.45,
+  "auto_suggest_precision": 1.0,
+  "known_issue_recall": 0.75,
+  "novel_issue_escalation_rate": 1.0,
+  "severity_agreement": 0.47,
+  "category_agreement": 0.83,
+  "agent_paths": {
+    "pipeline-fallback": 3,
+    "tools": 97
+  },
+  "latency_ms_p50": 1641.5,
+  "latency_ms_p95": 6714,
+  "errors": [
+    {
+      "alert": "CRIT: ens33 carrier lost; 5 link state changes observed in 90s; suspect uplink switch issue.",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 122,
+      "matched_incident_id": 122,
+      "reasoning": "Guardrail: the agent picked incident #122, but it is too dissimilar (distance=0.585, threshold=0.4). The alert matches a past incident of link flaps on the same type of interface caused by a faulty SFP module; replacing the SFP resolved it."
+    },
+    {
+      "alert": "ConnectTimeout: TCP handshake to 172.16.5.9:8080 timed out after 20s; check network ACLs.",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 148,
+      "matched_incident_id": 148,
+      "reasoning": "Guardrail: the agent picked incident #148, but it is too dissimilar (distance=0.422, threshold=0.4). The alert matches a previous incident where a TCP handshake timeout was caused by a firewall block; the same resolution of opening the required port applies."
+    },
+    {
+      "alert": "Exception in thread 'http-nio-8080-exec-1' java.lang.NoClassDefFoundError: com/fasterxml/jackson/databind/ObjectMapper at com.acme.ApiHandler.process(ApiHandler.java:42)",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 63,
+      "matched_incident_id": 63,
+      "reasoning": "No past incident matches the specific missing Jackson ObjectMapper class, indicating a new classpath issue."
+    },
+    {
+      "alert": "java.lang.NullPointerException at com.acme.OrderProcessor.process(OrderProcessor.java:456)",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 74,
+      "matched_incident_id": 94,
+      "reasoning": "The retrieved incidents involve a different component (PaymentProcessor) than the current OrderProcessor NPE, so the fix does not directly apply."
+    },
+    {
+      "alert": "java.net.SocketException: Connection reset by peer",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 69,
+      "matched_incident_id": 69,
+      "reasoning": "No past incident matches the exact 'connection reset by peer' failure mode; retrieved incidents involve different socket errors, so the root cause is unclear."
+    },
+    {
+      "alert": "java.lang.NullPointerException\n\tat com.acme.order.OrderService.create(OrderService.java:45)\n\tat com.acme.api.Controller.process(Controller.java:78)",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 154,
+      "matched_incident_id": 84,
+      "reasoning": "The retrieved incidents involve different services (UserService, PaymentProcessor); the null pointer occurs in OrderService, so the fix does not directly apply."
+    },
+    {
+      "alert": "java.lang.NullPointerException at com.acme.service.DataProcessor.process(DataProcessor.java:45)",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 52,
+      "matched_incident_id": 84,
+      "reasoning": "Past incidents involve different services; the null pointer occurs in a distinct component, so the fix does not directly apply."
+    },
+    {
+      "alert": "2026-10-05 08:30:12.550 UTC | AUTH FAILURE: Repeated invalid password attempts for user 'root' from IP 198.51.100.23 (15 attempts in 3 minutes). Account suspended.",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 108,
+      "matched_incident_id": 108,
+      "reasoning": "Guardrail: the agent picked incident #108, but it is too dissimilar (distance=0.400, threshold=0.4). The alert matches a previous incident of repeated invalid password attempts causing account lockout; applying the same mitigation (captcha challenge and manual verification) will resolve it."
+    },
+    {
+      "alert": "Login rejected: bad username or password",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 33,
+      "matched_incident_id": 46,
+      "reasoning": "The alert matches past incidents where invalid credentials caused the failure; the same fix of verifying and updating user credentials applies."
+    },
+    {
+      "alert": "ERROR: NullPointerException in com.corp.auth.TokenValidator.verify(TokenValidator.java:42)",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 84,
+      "matched_incident_id": 74,
+      "reasoning": "The retrieved incidents involve different classes and code locations; the root cause and fix are not guaranteed to apply to TokenValidator.verify."
+    },
+    {
+      "alert": "LB Error: 502 Bad Gateway; upstream 'auth-service' unreachable (ECONNREFUSED)",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 129,
+      "matched_incident_id": 129,
+      "reasoning": "Past incidents involve different upstream services (payment-api, inventory-service) and distinct root causes; the auth-service connection refusal is not the same problem."
+    },
+    {
+      "alert": "Thread 'pool-1-thread-2' threw java.lang.NullPointerException in com.acme.core.OrderService.process(OrderService.java:42)",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 134,
+      "matched_incident_id": 144,
+      "reasoning": "The retrieved incidents involve different services (PaymentProcessor, UserService); the NPE in OrderService is a distinct component, so past fixes do not guarantee a solution."
+    },
+    {
+      "alert": "500 Internal Error: NullPointerException thrown in com.acme.ApiHandler.process(ApiHandler.java:88)",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 67,
+      "matched_incident_id": 13,
+      "reasoning": "The past incidents involve different services and code locations; the null pointer occurs in a distinct component (com.acme.ApiHandler), so the fix does not apply."
+    },
+    {
+      "alert": "Pod redis-6d8f9a7b5c-9lmn terminated: OOMKilled (memory limit 256Mi exceeded)",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 125,
+      "matched_incident_id": 125,
+      "reasoning": "The retrieved incidents involve different components (nginx, Redis connection) and not the same OOM cause for this Redis pod, so the fix does not directly apply."
+    },
+    {
+      "alert": "com.acme.Service$Handler$$EnhancerBySpringCGLIB$$a1b2c3d4.execute(Unknown Source)",
+      "expected": "auto_suggest_fix",
+      "decision": "escalate",
+      "source_id": 28,
+      "matched_incident_id": 28,
+      "reasoning": "The retrieved incidents involve different services and failure modes; no exact match to the Spring CGLIB handler error, so a new investigation is needed."
+    }
+  ]
+}

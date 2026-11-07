@@ -1,0 +1,87 @@
+{
+  "generated_at": "2026-11-07T17:42:48.818144+00:00",
+  "queries": 100,
+  "knowledge_base_size": 193,
+  "embedding_model": "all-MiniLM-L6-v2 (384-d), pgvector cosine distance",
+  "hit@1": 0.92,
+  "hit@3": 0.96,
+  "hit@5": 0.99,
+  "mrr": 0.945,
+  "strict_hit@1": 0.71,
+  "strict_hit@3": 0.91,
+  "strict_hit@5": 0.98,
+  "misses_top3": [
+    {
+      "source_id": 74,
+      "alert": "java.lang.NullPointerException at com.acme.OrderProcessor.process(OrderProcessor.java:456)",
+      "retrieved": [
+        104,
+        154,
+        144,
+        94,
+        74
+      ],
+      "distances": [
+        0.346,
+        0.346,
+        0.349,
+        0.353,
+        0.422
+      ]
+    },
+    {
+      "source_id": 52,
+      "alert": "java.lang.NullPointerException at com.acme.service.DataProcessor.process(DataProcessor.java:45)",
+      "retrieved": [
+        144,
+        84,
+        94,
+        154,
+        104
+      ],
+      "distances": [
+        0.379,
+        0.38,
+        0.401,
+        0.402,
+        0.41
+      ]
+    },
+    {
+      "source_id": 134,
+      "alert": "Thread 'pool-1-thread-2' threw java.lang.NullPointerException in com.acme.core.OrderService.process(OrderService.java:42)",
+      "retrieved": [
+        104,
+        144,
+        154,
+        134,
+        84
+      ],
+      "distances": [
+        0.375,
+        0.404,
+        0.41,
+        0.419,
+        0.422
+      ]
+    },
+    {
+      "source_id": 49,
+      "alert": "org.apache.kafka.common.KafkaException: Failed to connect to broker at 10.5.5.5:9092\n\tat org.apache.kafka.clients.NetworkClient.initiateConnect(NetworkClient.java:450)\n\tat org.apache.kafka.clients.NetworkClient.ready(NetworkClient.java:210)",
+      "retrieved": [
+        55,
+        32,
+        15,
+        69,
+        49
+      ],
+      "distances": [
+        0.369,
+        0.535,
+        0.536,
+        0.562,
+        0.584
+      ]
+    }
+  ]
+}

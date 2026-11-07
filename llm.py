@@ -38,26 +38,43 @@ class LLMUnavailable(Exception):
         self.rate_limited = rate_limited
 
 
+def _create(timeout: float, **kwargs):
+    try:
+        return client.chat.completions.create(
+            model=MODEL,
+            max_tokens=MAX_TOKENS,
+            reasoning_effort="low",
+            timeout=timeout,
+            **kwargs,
+        )
+    except groq.RateLimitError as e:
+        raise LLMUnavailable("The AI provider is rate-limiting requests; try again in a minute.", rate_limited=True) from e
+    except (groq.APIConnectionError, groq.APITimeoutError, groq.InternalServerError, groq.AuthenticationError) as e:
+        raise LLMUnavailable(f"The AI provider is unavailable ({type(e).__name__}).") from e
+
+
 def chat_json(prompt: str, timeout: float = 20) -> dict:
     """Ask the model for a JSON object.
 
     Raises LLMUnavailable for provider problems and ValueError/JSONDecodeError for unusable output.
     Callers decide the fallback.
     """
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            reasoning_effort="low",
-            response_format={"type": "json_object"},
-            messages=[{"role": "user", "content": prompt}],
-            timeout=timeout,
-        )
-    except groq.RateLimitError as e:
-        raise LLMUnavailable("The AI provider is rate-limiting requests; try again in a minute.", rate_limited=True) from e
-    except (groq.APIConnectionError, groq.APITimeoutError, groq.InternalServerError, groq.AuthenticationError) as e:
-        raise LLMUnavailable(f"The AI provider is unavailable ({type(e).__name__}).") from e
+    response = _create(
+        timeout,
+        response_format={"type": "json_object"},
+        messages=[{"role": "user", "content": prompt}],
+    )
     content = response.choices[0].message.content or ""
     if response.choices[0].finish_reason == "length":
         print(f"[LLM WARN] response truncated at {MAX_TOKENS} tokens")
     return _extract_json(content)
+
+
+def chat_tools(messages: list[dict], tools: list[dict], timeout: float = 20):
+    """One function-calling turn. The model must call a tool (tool_choice="required").
+
+    Returns the assistant message (with .tool_calls). Raises LLMUnavailable for provider problems;
+    groq.BadRequestError surfaces when the model emits an invalid tool call.
+    """
+    response = _create(timeout, messages=messages, tools=tools, tool_choice="required")
+    return response.choices[0].message

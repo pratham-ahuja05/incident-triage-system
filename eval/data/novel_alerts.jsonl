@@ -1,0 +1,40 @@
+{"alert": "Elasticsearch cluster health RED: 3 primary shards unassigned on index logs-2026.11 after node es-data-4 left the cluster", "severity": "high", "category": "database"}
+{"alert": "etcdserver: mvcc: database space exceeded; kube-apiserver rejecting all writes", "severity": "critical", "category": "infrastructure"}
+{"alert": "NTP clock skew of 4.2s detected on host app-12 (chronyd unsynchronised for 3h)", "severity": "medium", "category": "infrastructure"}
+{"alert": "RabbitMQ memory high watermark reached (0.4 of 16GB) on rabbit@mq-2; publishers blocked on vhost /orders", "severity": "high", "category": "infrastructure"}
+{"alert": "Payment provider API returning 429 Too Many Requests: 38% of checkout calls throttled in the last 10 minutes", "severity": "high", "category": "application-error"}
+{"alert": "Cron job nightly-invoice-export did not run: last successful run was 49 hours ago", "severity": "medium", "category": "application-error"}
+{"alert": "MongoDB WiredTiger cache eviction stalled on mongo-0: 500+ operations queued, primary stepping down", "severity": "critical", "category": "database"}
+{"alert": "Terraform apply failed: Error acquiring the state lock (ConditionalCheckFailedException), lock ID 7f3a91c2", "severity": "low", "category": "infrastructure"}
+{"alert": "Cassandra ReadTimeoutException during read at consistency LOCAL_QUORUM (2 responses were required but only 1 replica responded)", "severity": "high", "category": "database"}
+{"alert": "Image pull failed on node pool ci-runners: toomanyrequests: You have reached your pull rate limit", "severity": "medium", "category": "infrastructure"}
+{"alert": "helm upgrade payments-api failed: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress", "severity": "medium", "category": "infrastructure"}
+{"alert": "Filesystem /var on host web-09 has 0 free inodes (100% inodes used) while only 41% of disk space is used", "severity": "high", "category": "infrastructure"}
+{"alert": "Swap usage at 95% on host batch-02; load average 48 on 8 cores", "severity": "medium", "category": "infrastructure"}
+{"alert": "Vault is sealed: core: vault is sealed; all secret reads returning 503", "severity": "critical", "category": "infrastructure"}
+{"alert": "Feature flag service serving stale config: version 1182 returned while 1190 is current; cache TTL not honoured", "severity": "medium", "category": "application-error"}
+{"alert": "RecursionError: maximum recursion depth exceeded while calling a Python object in category_tree.walk()", "severity": "medium", "category": "application-error"}
+{"alert": "Celery task process_refund[8c1e2a] exceeded hard time limit (300s); worker process killed", "severity": "medium", "category": "application-error"}
+{"alert": "NVIDIA Xid 79 on gpu-03: GPU has fallen off the bus; CUDA training jobs failing", "severity": "high", "category": "infrastructure"}
+{"alert": "IPv6 router advertisement storm on VLAN 40: 12k RA packets/s from fe80::1c2:3aff:fe11:9b2", "severity": "high", "category": "network"}
+{"alert": "MTU mismatch on VPN tunnel to eu-west-1: packets larger than 1400 bytes dropped (fragmentation needed, DF set)", "severity": "medium", "category": "network"}
+{"alert": "WebSocket connections on /ws/notifications dropped every 60s by the load balancer idle timeout", "severity": "medium", "category": "network"}
+{"alert": "SAML assertion rejected: NotOnOrAfter condition failed (assertion expired); Okta SSO logins failing", "severity": "high", "category": "authentication"}
+{"alert": "SMS provider returned error 30007 (carrier filtering) for 41% of MFA one-time-password messages", "severity": "high", "category": "authentication"}
+{"alert": "API key for partner acme-logistics revoked by the key rotation job; partner calls returning 403 since 09:12", "severity": "high", "category": "authentication"}
+{"alert": "Kafka consumer group billing-consumers lag at 1.2M messages on topic invoices and growing", "severity": "high", "category": "infrastructure"}
+{"alert": "Redis error: OOM command not allowed when used memory > 'maxmemory' on cache-primary", "severity": "high", "category": "database"}
+{"alert": "DNSSEC validation failure: RRSIG expired for zone example.org; resolvers returning SERVFAIL", "severity": "critical", "category": "network"}
+{"alert": "PostgreSQL autovacuum falling behind: table events has 48M dead tuples; transaction ID wraparound in 9M XIDs", "severity": "critical", "category": "database"}
+{"alert": "nginx: upstream sent too big header while reading response header from upstream auth-service", "severity": "medium", "category": "application-error"}
+{"alert": "Fluent Bit buffer full: chunks dropped for output es.0 after retry limit reached; logs not shipping", "severity": "medium", "category": "infrastructure"}
+{"alert": "Prometheus scrape failing for job node-exporter on 23 of 40 targets: context deadline exceeded", "severity": "medium", "category": "infrastructure"}
+{"alert": "pg_basebackup nightly backup failed: WAL archive gap detected after segment 0000000100000A2B000000F1", "severity": "high", "category": "database"}
+{"alert": "libvips segmentation fault (SIGSEGV) when processing TIFF uploads; image-service container restarting", "severity": "medium", "category": "application-error"}
+{"alert": "Scheduled reports delivered at 03:00 UTC instead of 09:00 IST since the daylight-saving change", "severity": "low", "category": "application-error"}
+{"alert": "Cart total differs from invoice total by 0.01 for 2.3% of multi-currency orders (rounding mismatch)", "severity": "medium", "category": "application-error"}
+{"alert": "Cloud billing alert: NAT gateway data processing cost up 340% day over day", "severity": "low", "category": "infrastructure"}
+{"alert": "Envoy circuit breaker open for cluster inventory-svc: upstream_rq_pending_overflow 5,312", "severity": "high", "category": "network"}
+{"alert": "ARP/neighbour table full on core switch sw-core-2; newly booted hosts unreachable", "severity": "high", "category": "network"}
+{"alert": "Let's Encrypt renewal failed for api.example.com: ACME HTTP-01 challenge returned 404 (certificate expires in 6 days)", "severity": "medium", "category": "infrastructure"}
+{"alert": "Account lockout policy misconfigured after deploy: users locked out after a single failed login attempt", "severity": "high", "category": "authentication"}

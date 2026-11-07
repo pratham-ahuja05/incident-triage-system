@@ -1,0 +1,227 @@
+{
+  "generated_at": "2026-11-07T18:04:32.249475+00:00",
+  "rounds": 12,
+  "alerts": 300,
+  "unhandled_failures": 0,
+  "completed": 300,
+  "dead_lettered": 0,
+  "recovered_by_sweeper": 0,
+  "rounds_detail": [
+    {
+      "round": 1,
+      "scenario": "ai-errors",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    },
+    {
+      "round": 2,
+      "scenario": "ai-hangs",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    },
+    {
+      "round": 3,
+      "scenario": "ai-garbage",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    },
+    {
+      "round": 4,
+      "scenario": "ai-outage",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    },
+    {
+      "round": 5,
+      "scenario": "redis-restart",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    },
+    {
+      "round": 6,
+      "scenario": "mixed",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    },
+    {
+      "round": 7,
+      "scenario": "ai-errors",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    },
+    {
+      "round": 8,
+      "scenario": "ai-hangs",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    },
+    {
+      "round": 9,
+      "scenario": "ai-garbage",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    },
+    {
+      "round": 10,
+      "scenario": "ai-outage",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    },
+    {
+      "round": 11,
+      "scenario": "redis-restart",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    },
+    {
+      "round": 12,
+      "scenario": "mixed",
+      "sent": 25,
+      "accepted": 25,
+      "ingest_status_counts": {
+        "202": 25
+      },
+      "status_counts": {
+        "COMPLETED": 25
+      },
+      "stuck": 0,
+      "lost": 0,
+      "duplicate_triage_results": 0,
+      "recovered_by_sweeper": 0,
+      "api_alive": true,
+      "unhandled": 0
+    }
+  ]
+}

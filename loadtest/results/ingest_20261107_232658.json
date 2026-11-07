@@ -1,0 +1,118 @@
+{
+  "generated_at": "2026-11-07T17:56:58.896229+00:00",
+  "api": "http://localhost:8080",
+  "runs": [
+    {
+      "target_rate": 25.0,
+      "duration_s": 60.0,
+      "sent": 1500,
+      "accepted": 1500,
+      "status_counts": {
+        "202": 1500
+      },
+      "send_window_s": 59.94,
+      "accepted_per_s": 25.0,
+      "latency_ms": {
+        "p50": 28.4,
+        "p95": 66.9,
+        "p99": 164.6,
+        "max": 350.3
+      },
+      "drain": {
+        "status_counts": {
+          "COMPLETED": 1500
+        },
+        "terminal": 1500,
+        "stuck": 0,
+        "duplicate_triage_results": 0,
+        "end_to_end_s": 61.0,
+        "end_to_end_per_s": 24.6
+      },
+      "tag": "loadtest-01ff9b73"
+    },
+    {
+      "target_rate": 50.0,
+      "duration_s": 60.0,
+      "sent": 3000,
+      "accepted": 3000,
+      "status_counts": {
+        "202": 3000
+      },
+      "send_window_s": 59.98,
+      "accepted_per_s": 50.0,
+      "latency_ms": {
+        "p50": 22.9,
+        "p95": 83.4,
+        "p99": 496.0,
+        "max": 1145.2
+      },
+      "drain": {
+        "status_counts": {
+          "COMPLETED": 3000
+        },
+        "terminal": 3000,
+        "stuck": 0,
+        "duplicate_triage_results": 0,
+        "end_to_end_s": 95.2,
+        "end_to_end_per_s": 31.5
+      },
+      "tag": "loadtest-8cbdd332"
+    },
+    {
+      "target_rate": 75.0,
+      "duration_s": 60.0,
+      "sent": 4500,
+      "accepted": 4500,
+      "status_counts": {
+        "202": 4500
+      },
+      "send_window_s": 60.01,
+      "accepted_per_s": 75.0,
+      "latency_ms": {
+        "p50": 19.6,
+        "p95": 41.6,
+        "p99": 50.4,
+        "max": 68.6
+      },
+      "drain": {
+        "status_counts": {
+          "COMPLETED": 4500
+        },
+        "terminal": 4500,
+        "stuck": 0,
+        "duplicate_triage_results": 0,
+        "end_to_end_s": 135.4,
+        "end_to_end_per_s": 33.2
+      },
+      "tag": "loadtest-16b1a577"
+    },
+    {
+      "target_rate": 100.0,
+      "duration_s": 60.0,
+      "sent": 6000,
+      "accepted": 6000,
+      "status_counts": {
+        "202": 6000
+      },
+      "send_window_s": 60.0,
+      "accepted_per_s": 100.0,
+      "latency_ms": {
+        "p50": 22.5,
+        "p95": 43.2,
+        "p99": 52.0,
+        "max": 72.3
+      },
+      "drain": {
+        "status_counts": {
+          "COMPLETED": 6000
+        },
+        "terminal": 6000,
+        "stuck": 0,
+        "duplicate_triage_results": 0,
+        "end_to_end_s": 180.7,
+        "end_to_end_per_s": 33.2
+      },
+      "tag": "loadtest-18323ad5"
+    }
+  ]
+}
